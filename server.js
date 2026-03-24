@@ -7,7 +7,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const url = 'mongodb+srv://Jamothey:12062000@largeproject.2mmcszw.mongodb.net/?appName=LargeProject';
+require('dotenv').config()
+
+const url = process.env.MONGODB_URL
 const client = new MongoClient(url);
 
 let db;
