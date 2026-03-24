@@ -148,6 +148,62 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+
+// get existing collections
+app.get('/api/collections', async (req, res) => {
+
+})
+
+// update collections
+app.put('/api/collections', async (req, res) => {
+
+})
+
+// add/remove collections
+app.post('/api/collections', async (req, res) => {
+
+})
+
+// get existing items
+app.get('/api/items', async (req, res) => {
+
+})
+
+// update items
+app.put('/api/items', async (req, res) => {
+
+})
+
+// add/remove items
+app.post('/api/items', async (req, res) => {
+
+})
+
+// get existing tags
+app.get('/api/tags', async (req, res) => {
+
+})
+
+// update tags
+app.put('/api/tags', async (req, res) => {
+
+})
+
+// add/remove tags
+app.post('/api/tags', async (req, res) => {
+
+})
+
+// request password reset
+app.post('/api/user/reset', async (req, res) => {
+
+})
+
+// password reset
+app.put('/api/user/reset', async (req, res) => {
+
+})
+
 startServer().catch(err => {
   console.error('Failed to start server:', err);
 });
