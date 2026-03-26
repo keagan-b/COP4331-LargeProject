@@ -245,6 +245,58 @@ app.delete('/api/categories', async (req, res) => {
 
 // get items in category
 app.get('/api/categories/items', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  try {
+    var categoryId = req.query.categoryId;
+  } catch (err) {
+    return req.status(400).json({
+      error: 'Missing required fields.'
+    })
+  }
+
+  // find specified category
+  try {
+    var category = await categories.findOne({_id: new mongodb.ObjectId(categoryId)});
+  }
+  catch (err) {
+    return res.status(400).json({
+      error: 'Invalid category ID'
+    })
+  }
+  
+  // check if category is null & user has permission to edit it
+  if (!category || !category.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Category not found, or lacking permissions.'
+    })
+  }
+
+  // get items related to category
+  try {
+    var userItems = await items.find({categoryId: category._id}, {projection: {userId: 0}}).toArray();
+
+    return res.status(200).json({
+      categoryId: categoryId,
+      items: userItems,
+      error: ""
+    })
+
+  } catch (err) {
+    return res.status(500).json({
+      items: [],
+      error: err.toString()
+    });
+  }
+
+  return
+
+
 
 })
 
