@@ -28,11 +28,11 @@ function makeSessionExpiration() {
 }
 
 async function isUserAuthd(req, res) {
-  var { token } = req.body;
   var isAuthd = true;
 
-  // ensure body has correct info
-  if (!token) {
+  try {
+    var token = req.header('token');
+  } catch (err) {
     res.status(400).json({
       error: 'Missing token'
     });
@@ -94,7 +94,6 @@ app.get('/api/categories', async (req, res) => {
   return res.status(200).json({
     userCategories: userCategories
   })
-
 })
 
 // update categories
@@ -114,7 +113,15 @@ app.patch('/api/categories', async (req, res) => {
   }
 
   // get category
-  var category = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) }); 
+  try {
+    var category = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category ID'
+    })
+  }
 
   // check if category is null & user has permission to edit it
   if (!category || !category.userId.equals(user._id)) {
@@ -183,8 +190,6 @@ app.post('/api/categories', async (req, res) => {
       error: err.toString()
     });
   }
-
-
 })
 
 // remove categories
@@ -204,7 +209,15 @@ app.delete('/api/categories', async (req, res) => {
   }
 
   // get category
-  var category = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) }); 
+  try {
+    var category = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category ID'
+    })
+  }
 
   // check if category is null & user has permission to remove it
   if (!category || !category.userId.equals(user._id)) {
@@ -227,6 +240,11 @@ app.delete('/api/categories', async (req, res) => {
       error: err.toString()
     });
   }
+
+})
+
+// get items in category
+app.get('/api/categories/items', async (req, res) => {
 
 })
 
@@ -312,24 +330,213 @@ app.get('/api/collections', async (req, res) => {
 //#region == CRUD Operations for Items ==
 
 
-// get existing items
+// get existing item
 app.get('/api/items', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
 
+  try {
+  var itemId = req.query.itemId;
+  } catch (err) {
+    return req.status(400).json({
+      error: 'Missing required fields.'
+    })
+  }
+
+  // find specified item
+  try {
+    var item = await items.findOne({userId: user._id, _id: new mongodb.ObjectId(itemId)}, {projection: {userId: 0}});
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid item ID'
+    })
+  }
+
+  // check if category is null & user has permission to edit it
+  if (!item) {
+    return res.status(400).json({
+      item: {},
+      error: 'Item not found, or lacking permissions.'
+    })
+  }
+
+  return res.status(200).json({
+    item: item,
+    error: ''
+  })
 })
 
 // update items
 app.patch('/api/items', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
 
+  var { itemId, itemName, categoryId } = req.body;
+
+  if (!itemId || (!itemName && !categoryId)) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  toUpdate = {}
+
+  if (itemName) {toUpdate["itemName"] = itemName}
+  if (categoryId) {
+    try {
+    toUpdate["categoryId"] = new mongodb.ObjectId(categoryId)
+    } catch (err) {
+      return res.status(400).json({
+        success: false, 
+        error: "Invalid category ID"
+      });
+    }
+  }
+
+  // get item
+  try {
+    var item = await items.findOne({ _id: new mongodb.ObjectId(itemId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid item ID'
+    })
+  }
+
+  // check if category is null & user has permission to edit it
+  if (!item || !item.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Item not found, or lacking permissions.'
+    })
+  }
+
+  // update category
+  try {
+    await items.updateOne(
+      { _id: item._id },
+      {
+        $set: toUpdate
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
 })
 
-// add/remove items
+// add items
 app.post('/api/items', async (req, res) => {
+// ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
 
+  var { itemName, categoryId } = req.body;
+
+  if (!itemName || !categoryId) {
+    return res.status(400).json({
+      error: 'Missing required fields.'
+    });
+  }
+  
+  try {
+    var newItem = {
+      userId: user._id,
+      categoryId: new mongodb.ObjectId(categoryId),
+      itemName: itemName
+    };
+  } catch (err) {
+    return res.status(400).json({
+      itemName: "",
+      categoryId: "",
+      error: "Invalid category ID"
+    })
+  }
+  try {
+    var result = await items.insertOne(newItem);
+
+    return res.status(200).json({
+      _id: result.insertedId.toString(),
+      itemName: itemName,
+      categoryId: categoryId,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      _id: '',
+      itemName: '',
+      categoryId: '',
+      error: err.toString()
+    });
+  }
 })
 
 // remove items
 app.delete('/api/items', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
 
+  var { itemId } = req.body;
+
+  if (!itemId) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get category
+  try {
+    var item = await items.findOne({ _id: new mongodb.ObjectId(itemId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid item ID'
+    })
+  }
+
+  // check if category is null & user has permission to remove it
+  if (!item || !item.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Item not found, or lacking permissions'
+    })
+  }
+
+  try {
+    await items.deleteOne({ _id: item._id });
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
 })
 
 //#endregion
