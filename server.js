@@ -89,7 +89,7 @@ app.get('/api/categories', async (req, res) => {
   }
 
   // find all categories belonging to this user
-  var userCategories = await categories.find( {userId: user._id} ).toArray()
+  var userCategories = await categories.find( {userId: user._id}, {projection: {userId: 0}} ).toArray()
 
   return res.status(200).json({
     userCategories: userCategories
