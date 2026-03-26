@@ -87,6 +87,14 @@ app.get('/api/categories', async (req, res) => {
   if (!isAuthd) {
     return res;
   }
+
+  // find all categories belonging to this user
+  var userCategories = await categories.find( {userId: user._id} ).toArray()
+
+  return res.status(200).json({
+    userCategories: userCategories
+  })
+
 })
 
 // update categories
@@ -96,6 +104,48 @@ app.patch('/api/categories', async (req, res) => {
   if (!isAuthd) {
     return res;
   }
+
+  var { categoryId, categoryName } = req.body;
+
+  if (!categoryId || !categoryName) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get category
+  var category = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) }); 
+
+  // check if category is null & user has permission to edit it
+  if (!category || !category.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Category not found, or lacking permissions.'
+    })
+  }
+
+  // update category
+  try {
+    await categories.updateOne(
+      { _id: category._id },
+      {
+        $set: {
+          categoryName: categoryName
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
+
 })
 
 // add categories
