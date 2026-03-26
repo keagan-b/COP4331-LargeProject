@@ -28,11 +28,10 @@ function makeSessionExpiration() {
 }
 
 async function isUserAuthd(req, res) {
+  var token = req.header('token');
   var isAuthd = true;
 
-  try {
-    var token = req.header('token');
-  } catch (err) {
+  if(!token){
     res.status(400).json({
       error: 'Missing token'
     });
