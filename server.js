@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient } = require('mongodb');
+const mongodb = require('mongodb');
 const crypto = require('crypto');
 
 const app = express();
@@ -10,10 +10,12 @@ app.use(express.json());
 require('dotenv').config()
 
 const url = process.env.MONGODB_URL
-const client = new MongoClient(url);
+const client = new mongodb.MongoClient(url);
 
 let db;
 let users;
+
+//#region == Utility Functions ==
 
 function makeSessionToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -25,15 +27,283 @@ function makeSessionExpiration() {
   return d;
 }
 
-async function startServer() {
-  await client.connect();
-  db = client.db('collections_db');
-  users = db.collection('users');
+async function isUserAuthd(req, res) {
+  var { token } = req.body;
+  var isAuthd = true;
 
-  app.listen(5000, () => {
-    console.log('Server running on port 5000');
-  });
+  // ensure body has correct info
+  if (!token) {
+    res.status(400).json({
+      error: 'Missing token'
+    });
+    isAuthd = false;
+  }
+
+  if (isAuthd) {
+    var user = await getUserFromToken(token);
+    if (user == false) {
+      res.status(403).json({
+        error: 'Token expired'
+      });
+      isAuthd = false;
+    }
+    else if (user == null) {
+      res.status(403).json({
+        error: 'Invalid token'
+      });
+      isAuthd = false;
+    }
+  }
+
+  return [res, isAuthd, user];
 }
+
+async function getUserFromToken(token) {
+  // fetch a User object from a supplied token
+  var user = await users.findOne({ sessionToken: token });
+
+  // check that a user was found
+  if (user != null) {
+    var currentTime = new Date();
+    // ensure token is still valid
+    if (currentTime >= user.sessionExpiration)
+    {
+      // expired token, do not return a user, return 'false'
+      user = false;
+    }
+  }
+
+  return user;
+}
+
+//#endregion
+
+//#region == CRUD Operations for Categories ==
+
+// get existing categories
+app.get('/api/categories', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+})
+
+// update categories
+app.patch('/api/categories', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+})
+
+// add categories
+app.post('/api/categories', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { categoryName } = req.body;
+
+  if (!categoryName) {
+    return res.status(400).json({
+      error: 'Missing required fields.'
+    })
+  }
+
+  try {
+    var newCategory = {
+      userId: user._id,
+      categoryName: categoryName
+    };
+
+    var result = await categories.insertOne(newCategory);
+
+    return res.status(200).json({
+      _id: result.insertedId.toString(),
+      categoryName: categoryName
+    });
+  } catch (err) {
+    return res.status(500).json({
+      _id: '',
+      categoryName: '',
+      error: err.toString()
+    });
+  }
+
+
+})
+
+// remove categories
+app.delete('/api/categories', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { categoryId } = req.body;
+
+  if (!categoryId) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get category
+  var category = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) }); 
+
+  // check if category is null & user has permission to remove it
+  if (!category || !category.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Category not found, or lacking permissions.'
+    })
+  }
+
+  try {
+    await categories.deleteOne({ _id: category._id });
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
+
+})
+
+//#endregion
+
+//#region == CRUD Operations for Collections ==
+
+// add collections
+app.post('/api/collections', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { categoryId, collectionName } = req.body;
+
+  if (!collectionName) {
+    return req.status(400).json({
+      error: 'Missing required fields.'
+    });
+  }
+
+  try {
+    var newCollection = {
+      userId: user._id,
+      categoryId: categoryId,
+      collectionName: collectionName
+    };
+
+    var result = await collections.insertOne(newCollection);
+
+    return res.status(200).json({
+      id: result.insertedId.toString(),
+      collectionName: collectionName
+    });
+  } catch (err) {
+    return res.status(500).json({
+      id: '',
+      collectionName: '',
+      error: err.toString()
+    });
+  }
+
+})
+
+// remove collections
+app.delete('/api/collections', async (req, res) => {
+
+})
+
+// update collections
+app.patch('/api/collections', async (req, res) => {
+
+})
+
+// get existing collections
+app.get('/api/collections', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+  
+  // find collections matching user data
+  const collections = await collections.find({ userId: user._id })
+
+  // no collections found, return empty array
+  if (!collections) {
+    collections = []
+  }
+
+  // return found collections
+  return res.status(200).json({
+    collections: collections,
+    error: ''
+  })
+
+})
+
+//#endregion
+
+//#region == CRUD Operations for Items ==
+
+
+// get existing items
+app.get('/api/items', async (req, res) => {
+
+})
+
+// update items
+app.patch('/api/items', async (req, res) => {
+
+})
+
+// add/remove items
+app.post('/api/items', async (req, res) => {
+
+})
+
+// remove items
+app.delete('/api/items', async (req, res) => {
+
+})
+
+//#endregion
+
+//#region == CRUD Operations for Tags ==
+
+// get existing tags
+app.get('/api/tags', async (req, res) => {
+
+})
+
+// update tags
+app.put('/api/tags', async (req, res) => {
+
+})
+
+// add/remove tags
+app.post('/api/tags', async (req, res) => {
+
+})
+
+//#endregion
+
+//#region == User Operations ==
 
 app.post('/api/register', async (req, res) => {
   const { email, password } = req.body;
@@ -150,52 +420,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-
-// get existing collections
-app.get('/api/collections', async (req, res) => {
-
-})
-
-// update collections
-app.put('/api/collections', async (req, res) => {
-
-})
-
-// add/remove collections
-app.post('/api/collections', async (req, res) => {
-
-})
-
-// get existing items
-app.get('/api/items', async (req, res) => {
-
-})
-
-// update items
-app.put('/api/items', async (req, res) => {
-
-})
-
-// add/remove items
-app.post('/api/items', async (req, res) => {
-
-})
-
-// get existing tags
-app.get('/api/tags', async (req, res) => {
-
-})
-
-// update tags
-app.put('/api/tags', async (req, res) => {
-
-})
-
-// add/remove tags
-app.post('/api/tags', async (req, res) => {
-
-})
-
 // request password reset
 app.post('/api/user/reset', async (req, res) => {
 
@@ -206,6 +430,25 @@ app.put('/api/user/reset', async (req, res) => {
 
 })
 
+//#endregion
+
+//#region == Server Start Command & Function ==
+
+async function startServer() {
+  await client.connect();
+  db = client.db('collections_db');
+  users = db.collection('users');
+  collections = db.collection('collections');
+  categories = db.collection('categories');
+  items = db.collection('items');
+
+  app.listen(5000, () => {
+    console.log('Server running on port 5000');
+  });
+}
+
 startServer().catch(err => {
   console.error('Failed to start server:', err);
 });
+
+//#endregion
