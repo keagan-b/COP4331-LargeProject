@@ -349,8 +349,64 @@ app.delete('/api/collections', async (req, res) => {
 
 // update collections
 app.patch('/api/collections', async (req, res) => {
+  var[res, isAuthd, user] = await isUserAuthd(req, res);
+  if(!isAuthd) {
+    return res;
+  }
 
-})
+  var { collectionId, collectionName, categoryId } = req.body;
+
+  if(!collectionId || (!collectionName && !categoryId)) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    });
+  }
+
+  try {
+    var collection = await collections.findOne({ _id: new mongodb.ObjectId(collectionId) });
+
+    if(!collection || !collection.userId.equals(user._id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Collection not found, or lacking permissions.'
+      });
+    }
+
+    var toUpdate = {};
+
+    if(collectionName) {
+      toUpdate.collectionName = collectionName;
+    }
+
+    if(categoryId) {
+      var caregory = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) });
+      
+      if(!category || !category.userId.equals(user._id)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Category not found, or lacking permissions.'
+        });
+      }
+      
+      toUpdate.categoryId = category._id;
+    }
+
+    await collections.updateOne(
+      { _id: collection._id },
+      { $set: toUpdate }
+    );
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid collection ID or category ID'
+    });
+  }
+});
 
 // get existing collections
 app.get('/api/collections', async (req, res) => {
