@@ -344,7 +344,42 @@ app.post('/api/collections', async (req, res) => {
 
 // remove collections
 app.delete('/api/collections', async (req, res) => {
+  var[res, isAuthd, user] = await isUserAuthd(req, res);
+  if(!isAuthd){
+    return res;
+  }
 
+  var { collectionId } = req.body;
+
+  if(!collectionId) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    });
+  }
+
+  try {
+    var collection = await collections.findOne({ _id: new mongodb.ObjectId(collectionId) });
+
+    if (!collection || !collection.userId.equals(user._id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Collection not found, or lacking permissions.'
+      });
+    }
+
+    await collectionItems.deleteMany({ collectionId: collection._id });
+    await collections.deleteOne({ _id: collection._id });
+
+    return res.status(200).json({
+      succes: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid collection ID'
+    });
+  }
 })
 
 // update collections
