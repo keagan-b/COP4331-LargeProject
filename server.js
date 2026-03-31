@@ -683,21 +683,203 @@ app.delete('/api/items', async (req, res) => {
 
 //#endregion
 
-//#region == CRUD Operations for Tags ==
+//#region == CRUD Operations for Collection Criteria ==
 
-// get existing tags
-app.get('/api/tags', async (req, res) => {
+// get existing collection criteria
+app.get('/api/collections/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
 
+  try {
+  var criteriaId = req.query.criteriaId;
+  } catch (err) {
+    return req.status(400).json({
+      error: 'Missing required fields.'
+    })
+  }
+
+  // find specified criteria
+  try {
+    var criteria = await collectionCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(criteriaId)}, {projection: {userId: 0}});
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid collection criteria ID'
+    })
+  }
+
+  // check if criteria is null & user has permission to edit it
+  if (!item) {
+    return res.status(400).json({
+      item: {},
+      error: 'Collection criteria not found, or lacking permissions.'
+    })
+  }
+
+  return res.status(200).json({
+    item: item,
+    error: ''
+  })
 })
 
-// update tags
-app.put('/api/tags', async (req, res) => {
+// update collection criteria
+app.patch('/api/collections/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
 
+  var { categoryId, criteriaName } = req.body;
+
+  if (!criteriaId || !criteriaName) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get item
+  try {
+    var criteria = await categoryCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category criteria ID'
+    })
+  }
+
+  // check if category is null & user has permission to edit it
+  if (!criteria || !criteria.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Category criteria not found, or lacking permissions.'
+    })
+  }
+
+  // update category
+  try {
+    await categoryCriteria.updateOne(
+      { _id: criteria._id },
+      {
+        $set: {
+          criteriaName: criteriaName
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
 })
 
-// add/remove tags
-app.post('/api/tags', async (req, res) => {
+// add collection criteria
+app.post('/api/collections/criteria', async (req, res) => {
+// ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
 
+  var { criteriaName, categoryId } = req.body;
+
+  if (!criteriaName || !categoryId) {
+    return res.status(400).json({
+      error: 'Missing required fields.'
+    });
+  }
+  
+  try {
+    var newCriteria = {
+      userId: user._id,
+      categoryId: new mongodb.ObjectId(categoryId),
+      criteriaName: criteriaName
+    };
+  } catch (err) {
+    return res.status(400).json({
+      criteriaName: "",
+      categoryId: "",
+      error: "Invalid category ID"
+    })
+  }
+  try {
+    var result = await categoryCriteria.insertOne(newCriteria);
+
+    return res.status(200).json({
+      _id: result.insertedId.toString(),
+      categoryname: categoryName,
+      categoryId: categoryId,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      _id: '',
+      criteriaName: '',
+      categoryId: '',
+      error: err.toString()
+    });
+  }
+})
+
+// delete collection criteria
+app.delete('api/collections/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { criteriaId } = req.body;
+
+  if (!criteriaId) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get category
+  try {
+    var criteria = await categoryCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category criteria ID'
+    })
+  }
+
+  // check if category is null & user has permission to remove it
+  if (!criteria || !criteria.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Category criteria not found, or lacking permissions'
+    })
+  }
+
+  try {
+    await categoryCriteria.deleteOne({ _id: criteria._id });
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
 })
 
 //#endregion
@@ -841,6 +1023,8 @@ async function startServer() {
   categories = db.collection('categories');
   items = db.collection('items');
   collectionItems = db.collection('collection_items');
+  collectionCriteria = db.collection('collection_criteria');
+  itemCriteria = db.collection('item_criteria');
 
   app.listen(5000, () => {
     console.log('Server running on port 5000');
