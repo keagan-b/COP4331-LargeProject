@@ -414,7 +414,7 @@ app.patch('/api/collections', async (req, res) => {
     }
 
     if(categoryId) {
-      var caregory = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) });
+      var category = await categories.findOne({ _id: new mongodb.ObjectId(categoryId) });
       
       if(!category || !category.userId.equals(user._id)) {
         return res.status(400).json({
@@ -649,12 +649,18 @@ app.delete('/api/items', async (req, res) => {
 
   // get category
   try {
+    await collectionItems.deleteMany({ itemId: item._id });
+    await items.deleteOne({ _id: item._id });
     var item = await items.findOne({ _id: new mongodb.ObjectId(itemId) }); 
-  }
-  catch (err) {
-    return res.status(400).json({
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    })
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      error: 'Invalid item ID'
+      error: err.toString()
     })
   }
 
@@ -703,7 +709,7 @@ app.get('/api/categories/criteria', async (req, res) => {
 
   // find specified criteria
   try {
-    var criteria = await collectionCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(criteriaId)}, {projection: {userId: 0}});
+    var criteria = await categoryCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(criteriaId)}, {projection: {userId: 0}});
   }
   catch (err) {
     return res.status(400).json({
@@ -1023,7 +1029,7 @@ async function startServer() {
   categories = db.collection('categories');
   items = db.collection('items');
   collectionItems = db.collection('collection_items');
-  collectionCriteria = db.collection('collection_criteria');
+  categoryCriteria = db.collection('category_criteria');
   itemCriteria = db.collection('item_criteria');
 
   app.listen(5000, () => {
