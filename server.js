@@ -683,10 +683,10 @@ app.delete('/api/items', async (req, res) => {
 
 //#endregion
 
-//#region == CRUD Operations for Collection Criteria ==
+//#region == CRUD Operations for category criteria ==
 
-// get existing collection criteria
-app.get('/api/collections/criteria', async (req, res) => {
+// get existing category criteria
+app.get('/api/categories/criteria', async (req, res) => {
   // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
@@ -708,7 +708,7 @@ app.get('/api/collections/criteria', async (req, res) => {
   catch (err) {
     return res.status(400).json({
       success: false,
-      error: 'Invalid collection criteria ID'
+      error: 'Invalid category criteria ID'
     })
   }
 
@@ -716,7 +716,7 @@ app.get('/api/collections/criteria', async (req, res) => {
   if (!item) {
     return res.status(400).json({
       item: {},
-      error: 'Collection criteria not found, or lacking permissions.'
+      error: 'category criteria not found, or lacking permissions.'
     })
   }
 
@@ -726,8 +726,8 @@ app.get('/api/collections/criteria', async (req, res) => {
   })
 })
 
-// update collection criteria
-app.patch('/api/collections/criteria', async (req, res) => {
+// update category criteria
+app.patch('/api/categories/criteria', async (req, res) => {
   // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
@@ -784,8 +784,8 @@ app.patch('/api/collections/criteria', async (req, res) => {
   }
 })
 
-// add collection criteria
-app.post('/api/collections/criteria', async (req, res) => {
+// add category criteria
+app.post('/api/categories/criteria', async (req, res) => {
 // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
@@ -832,8 +832,8 @@ app.post('/api/collections/criteria', async (req, res) => {
   }
 })
 
-// delete collection criteria
-app.delete('api/collections/criteria', async (req, res) => {
+// delete category criteria
+app.delete('api/categories/criteria', async (req, res) => {
   // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
