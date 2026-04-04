@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mongodb = require('mongodb');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(cors());
@@ -73,6 +74,36 @@ async function getUserFromToken(token) {
   }
 
   return user;
+}
+
+function makeEmailVerificationToken(){
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function makeEmailVerificationExpiration(){
+  const d =  new Date();
+  d.setHours(d.getHours() + 24); // as of right now token is good for 24 hours
+
+  return d;
+}
+
+async function sendVerificationEmail(emai, token){
+  const cerifyUrl = `${process.env.APP_BASE_URL}/api/user/verify-email?token=${token}`;
+
+  const message = {
+    from: process.env.EMAIL_FROM,
+    to: email,
+    subject: 'Verify your email',
+    text: `Welcome! Verify your email by visiting this link: ${verifyUrl}`,
+    html: `
+      <p>Welcome!</p>
+      <p>Please verify your email by clicking the link below:</p>
+      <p><a href=${verifyUrl}">${verifyUrl}</a></p>
+      <p>This link expires in 24 hours.</p>
+    `
+  };
+
+  await mailTransporter.sendMail(message);
 }
 
 //#endregion
@@ -730,14 +761,20 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    const sessionToken = makeSessionToken();
-    const sessionExpiration = makeSessionExpiration();
+    const emailVerificationToken = makeEmailVerificationToke();
+    const emailVerificationExpiration = makeEmailVerificationExpiration();
+
+    // const sessionToken = makeSessionToken();
+    // const sessionExpiration = makeSessionExpiration();
 
     const newUser = {
       email,
       password,
-      sessionToken,
-      sessionExpiration,
+      isVerified: false,
+      emailVerificationToken,
+      emailVerificationExpiration,
+      sessionToken: null,
+      sessionExpiration: null,
       passwordResetToken: null,
       passwordResetExpiration: null
     };
@@ -788,6 +825,16 @@ app.post('/api/login', async (req, res) => {
       });
     }
 
+    if(!user.isVerified) {
+      return res.status(403).json({
+        id: '',
+        email: '',
+        sessionToken: '',
+        sessionExpiration: '',
+        error: 'Please verify your email before logging in'
+      });
+    }
+
     const sessionToken = makeSessionToken();
     const sessionExpiration = makeSessionExpiration();
 
@@ -819,6 +866,43 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.get('/api/user/verify-email', async(req, res) =>{
+  const { token } = req.query;
+
+  if(!token) {
+    return res.status(400).send('Missing verification token');
+  }
+
+  try {
+    const user = await users.findOne({ emailVerificationToken: token });
+    
+    if(!user) {
+      return res.status(400).send('Invalid verification token');
+    }
+
+    if(!user.emailVerificationExpiration || new Date() >= user.emailVerificationExpiration) {
+      return res.status(400).send('Verification token has expired');
+    }
+
+    await usurs.updateOne(
+      { _id: user._id },
+      {
+        $set : {
+          isVerified: true
+        },
+        $unset: {
+          emailVerificationToken: "",
+          emailVerificationExpiration: ""
+        }
+      }
+    );
+
+    return res.status(200).send('Email verified successfully. You can now log in.');
+  } catch (err) {
+    return res.status(500).send('Server error while verifying email');
+  }
+});
+
 // request password reset
 app.post('/api/user/reset', async (req, res) => {
 
@@ -842,6 +926,18 @@ async function startServer() {
   items = db.collection('items');
   collectionItems = db.collection('collection_items');
 
+  mailTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+
+  await mailTransporter.verify();
+  console.log('SMTP server is ready to take messages');
   app.listen(5000, () => {
     console.log('Server running on port 5000');
   });
