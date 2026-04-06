@@ -18,13 +18,14 @@ let users;
 
 //#region == Utility Functions ==
 
-function makeSessionToken() {
+function makeToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function makeSessionExpiration() {
+function makeExpiration(delay_days, delay_hours) {
   const d = new Date();
-  d.setDate(d.getDate() + 7); // 7 days from now
+  d.setDate(d.getDate() + delay_days); // add delay as days from now
+  d.setHours(d.getHours() + delay_hours); // add delay as hours from now
   return d;
 }
 
@@ -76,15 +77,33 @@ async function getUserFromToken(token) {
   return user;
 }
 
-function makeEmailVerificationToken(){
-  return crypto.randomBytes(32).toString('hex');
-}
+async function sendEmail(to, subject, content) {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: "smtp.azurecomm.net",
+      port: 587,
+      secure: false,
+      auth: {
+        user: "",
+        pass: ""
+      },
+      tls: {
+        ciphers: "TLSv1.2"
+      }
+    });
 
-function makeEmailVerificationExpiration(){
-  const d =  new Date();
-  d.setHours(d.getHours() + 24); // as of right now token is good for 24 hours
+    await transporter.sendMail({
+      from: "",
+      to: to,
+      subject: subject,
+      html: content
 
-  return d;
+    })
+
+  }
+  catch (error) {
+    console.error("Error sending email:", error)
+  }
 }
 
 async function sendVerificationEmail(emai, token){
@@ -835,8 +854,8 @@ app.post('/api/login', async (req, res) => {
       });
     }
 
-    const sessionToken = makeSessionToken();
-    const sessionExpiration = makeSessionExpiration();
+    const sessionToken = makeToken();
+    const sessionExpiration = makeExpiration(7, 0);
 
     await users.updateOne(
       { _id: user._id },
