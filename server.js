@@ -54,6 +54,12 @@ async function isUserAuthd(req, res) {
       });
       isAuthd = false;
     }
+    else if (user.is_verified == false) {
+      res.status(403).json({
+        error: 'Email not verified'
+      });
+      isAuthd = false;
+    }
   }
 
   return [res, isAuthd, user];
@@ -80,12 +86,12 @@ async function getUserFromToken(token) {
 async function sendEmail(to, subject, content) {
   try {
     const transporter = nodemailer.createTransport({
-      host: "smtp.azurecomm.net",
-      port: 587,
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
       secure: false,
       auth: {
-        user: "",
-        pass: ""
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
       },
       tls: {
         ciphers: "TLSv1.2"
@@ -93,7 +99,7 @@ async function sendEmail(to, subject, content) {
     });
 
     await transporter.sendMail({
-      from: "",
+      from: process.env.SMTP_NO_REPLY,
       to: to,
       subject: subject,
       html: content
@@ -106,23 +112,24 @@ async function sendEmail(to, subject, content) {
   }
 }
 
-async function sendVerificationEmail(emai, token){
-  const cerifyUrl = `${process.env.APP_BASE_URL}/api/user/verify-email?token=${token}`;
+async function sendVerificationEmail(user){
+  emailVerificationToken = makeToken();
 
-  const message = {
-    from: process.env.EMAIL_FROM,
-    to: email,
-    subject: 'Verify your email',
-    text: `Welcome! Verify your email by visiting this link: ${verifyUrl}`,
-    html: `
-      <p>Welcome!</p>
-      <p>Please verify your email by clicking the link below:</p>
-      <p><a href=${verifyUrl}">${verifyUrl}</a></p>
-      <p>This link expires in 24 hours.</p>
-    `
-  };
+  // save verification details
+  await users.updateOne(
+      { _id: user._id },
+      { $set: 
+        {
+          emailVerificationToken: emailVerificationToken
+        }
+       }
+    );
 
-  await mailTransporter.sendMail(message);
+  var cerifyUrl = `${process.env.APP_BASE_URL}/api/user/verify-email?token=${emailVerificationToken}`;
+
+  var content = "Welcome to Collector’s Pair-A-Dice! Please verify your email with this link: " + cerifyUrl
+
+  await sendEmail(user.email, "Please Verify Your Email", content)
 }
 
 //#endregion
@@ -942,7 +949,7 @@ app.delete('api/categories/criteria', async (req, res) => {
 
 //#region == User Operations ==
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/user/register', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -968,18 +975,11 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    const emailVerificationToken = makeEmailVerificationToke();
-    const emailVerificationExpiration = makeEmailVerificationExpiration();
-
-    // const sessionToken = makeSessionToken();
-    // const sessionExpiration = makeSessionExpiration();
-
     const newUser = {
       email,
       password,
       isVerified: false,
-      emailVerificationToken,
-      emailVerificationExpiration,
+      emailVerificationToken: null,
       sessionToken: null,
       sessionExpiration: null,
       passwordResetToken: null,
@@ -988,11 +988,14 @@ app.post('/api/register', async (req, res) => {
 
     const result = await users.insertOne(newUser);
 
+    const createdUser = await users.findOne({ _id: result.insertedId });
+    await sendVerificationEmail(createdUser);
+
     return res.status(200).json({
       id: result.insertedId.toString(),
       email,
-      sessionToken,
-      sessionExpiration,
+      sessionToken: '',
+      sessionExpiration: '',
       error: ''
     });
   } catch (err) {
@@ -1006,7 +1009,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/user/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -1042,24 +1045,28 @@ app.post('/api/login', async (req, res) => {
       });
     }
 
-    const sessionToken = makeToken();
-    const sessionExpiration = makeExpiration(7, 0);
+    var currentTime = new Date();
 
-    await users.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          sessionToken: sessionToken,
-          sessionExpiration: sessionExpiration
-        }
-      }
-    );
+    // ensure token is still valid, replace if not
+    if (currentTime >= user.sessionExpiration) {
+      var sessionToken = makeToken();
+      var sessionExpiration = makeExpiration(7, 0);
+
+      await users.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            sessionToken: sessionToken,
+            sessionExpiration: sessionExpiration
+          }
+        });
+    }
 
     return res.status(200).json({
       id: user._id.toString(),
       email: user.email,
-      sessionToken,
-      sessionExpiration,
+      sessionToken: sessionToken,
+      sessionExpiration: sessionExpiration,
       error: ''
     });
   } catch (err) {
@@ -1087,19 +1094,12 @@ app.get('/api/user/verify-email', async(req, res) =>{
       return res.status(400).send('Invalid verification token');
     }
 
-    if(!user.emailVerificationExpiration || new Date() >= user.emailVerificationExpiration) {
-      return res.status(400).send('Verification token has expired');
-    }
-
-    await usurs.updateOne(
+    await users.updateOne(
       { _id: user._id },
       {
         $set : {
-          isVerified: true
-        },
-        $unset: {
+          isVerified: true,
           emailVerificationToken: "",
-          emailVerificationExpiration: ""
         }
       }
     );
@@ -1111,12 +1111,82 @@ app.get('/api/user/verify-email', async(req, res) =>{
 });
 
 // request password reset
-app.post('/api/user/reset', async (req, res) => {
+app.get('/api/user/request-password-reset', async (req, res) => {
+  var { email } = req.query;
+
+  // attempt to find user account with email
+  var user = await users.findOne( { email: email });
+
+  // if user found, send password reset
+  if (user && user.isVerified) {
+    // generate new password token & expiration
+    var passwordResetToken = makeToken()
+    var passwordResetExpiration = makeExpiration(0, 1)
+
+    // update user
+    await users.updateOne(
+      {_id: user._id},
+      {
+        $set : {
+          passwordResetToken: passwordResetToken,
+          passwordResetExpiration, passwordResetExpiration
+        }
+      }
+    )
+
+    var resetUrl = `${process.env.APP_BASE_URL}/api/user/reset-password?token=${passwordResetToken}`;
+
+    var content = '<p>Please use this link to reset your password: <a href="' + resetUrl + '">reset</a><br><i>The link will expire in 1 hour.</i></p>'
+
+    sendEmail(email, "Password Reset", content)
+  }
+  
+  return res.status(200).send("Password reset sent.")
 
 })
 
 // password reset
-app.put('/api/user/reset', async (req, res) => {
+app.put('/api/user/reset-password', async (req, res) => {
+  var { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({
+      error: 'Missing required data'
+    })
+  }
+
+  // find user with password reset token
+  var user = await users.findOne({passwordResetToken: token})
+
+  if (!user) {
+    return res.status(400).json({
+      error: 'Invalid password reset token'
+    })
+  }
+
+  var currentTime = new Date();
+  // ensure token is still valid, replace if not
+  if (currentTime >= user.passwordResetExpiration) {
+    return res.status(400).json({
+      error: 'Password reset token expired'
+    })
+  }
+
+  // update password
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        sessionToken: null,
+        sessionExpiration: null,
+        passwordResetToken: null,
+        passwordResetExpiration: null,
+        password: newPassword
+      }
+    }
+  )
+
+  return res.status(200).json({error: ''})
 
 })
 
@@ -1135,18 +1205,6 @@ async function startServer() {
   categoryCriteria = db.collection('category_criteria');
   itemCriteria = db.collection('item_criteria');
 
-  mailTransporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  });
-
-  await mailTransporter.verify();
-  console.log('SMTP server is ready to take messages');
   app.listen(5000, () => {
     console.log('Server running on port 5000');
   });
