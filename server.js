@@ -127,7 +127,7 @@ async function sendVerificationEmail(user){
 
   var cerifyUrl = `${process.env.APP_BASE_URL}/api/user/verify-email?token=${emailVerificationToken}`;
 
-  var content = "Welcome to Collector’s Pair-A-Dice! Pleaase verify your email with this link: " + cerifyUrl
+  var content = "Welcome to Collector’s Pair-A-Dice! Please verify your email with this link: " + cerifyUrl
 
   await sendEmail(user.email, "Please Verify Your Email", content)
 }
@@ -857,18 +857,22 @@ app.post('/api/user/login', async (req, res) => {
       });
     }
 
-    var sessionToken = makeToken();
-    var sessionExpiration = makeExpiration(7, 0);
+    var currentTime = new Date();
 
-    await users.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          sessionToken: sessionToken,
-          sessionExpiration: sessionExpiration
-        }
-      }
-    );
+    // ensure token is still valid, replace if not
+    if (currentTime >= user.sessionExpiration) {
+      var sessionToken = makeToken();
+      var sessionExpiration = makeExpiration(7, 0);
+
+      await users.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            sessionToken: sessionToken,
+            sessionExpiration: sessionExpiration
+          }
+        });
+    }
 
     return res.status(200).json({
       id: user._id.toString(),
@@ -906,9 +910,7 @@ app.get('/api/user/verify-email', async(req, res) =>{
       { _id: user._id },
       {
         $set : {
-          isVerified: true
-        },
-        $unset: {
+          isVerified: true,
           emailVerificationToken: "",
         }
       }
@@ -921,12 +923,82 @@ app.get('/api/user/verify-email', async(req, res) =>{
 });
 
 // request password reset
-app.post('/api/user/request-password-reset', async (req, res) => {
+app.get('/api/user/request-password-reset', async (req, res) => {
+  var { email } = req.query;
+
+  // attempt to find user account with email
+  var user = await users.findOne( { email: email });
+
+  // if user found, send password reset
+  if (user && user.isVerified) {
+    // generate new password token & expiration
+    var passwordResetToken = makeToken()
+    var passwordResetExpiration = makeExpiration(0, 1)
+
+    // update user
+    await users.updateOne(
+      {_id: user._id},
+      {
+        $set : {
+          passwordResetToken: passwordResetToken,
+          passwordResetExpiration, passwordResetExpiration
+        }
+      }
+    )
+
+    var resetUrl = `${process.env.APP_BASE_URL}/api/user/reset-password?token=${passwordResetToken}`;
+
+    var content = '<p>Please use this link to reset your password: <a href="' + resetUrl + '">reset</a><br><i>The link will expire in 1 hour.</i></p>'
+
+    sendEmail(email, "Password Reset", content)
+  }
+  
+  return res.status(200).send("Password reset sent.")
 
 })
 
 // password reset
-app.put('/api/user/reset', async (req, res) => {
+app.put('/api/user/reset-password', async (req, res) => {
+  var { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({
+      error: 'Missing required data'
+    })
+  }
+
+  // find user with password reset token
+  var user = await users.findOne({passwordResetToken: token})
+
+  if (!user) {
+    return res.status(400).json({
+      error: 'Invalid password reset token'
+    })
+  }
+
+  var currentTime = new Date();
+  // ensure token is still valid, replace if not
+  if (currentTime >= user.passwordResetExpiration) {
+    return res.status(400).json({
+      error: 'Password reset token expired'
+    })
+  }
+
+  // update password
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        sessionToken: null,
+        sessionExpiration: null,
+        passwordResetToken: null,
+        passwordResetExpiration: null,
+        password: newPassword
+      }
+    }
+  )
+
+  return res.status(200).json({error: ''})
 
 })
 
