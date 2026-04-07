@@ -54,6 +54,12 @@ async function isUserAuthd(req, res) {
       });
       isAuthd = false;
     }
+    else if (user.is_verified == false) {
+      res.status(403).json({
+        error: 'Email not verified'
+      });
+      isAuthd = false;
+    }
   }
 
   return [res, isAuthd, user];
@@ -80,12 +86,12 @@ async function getUserFromToken(token) {
 async function sendEmail(to, subject, content) {
   try {
     const transporter = nodemailer.createTransport({
-      host: "smtp.azurecomm.net",
-      port: 587,
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
       secure: false,
       auth: {
-        user: "",
-        pass: ""
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
       },
       tls: {
         ciphers: "TLSv1.2"
@@ -93,7 +99,7 @@ async function sendEmail(to, subject, content) {
     });
 
     await transporter.sendMail({
-      from: "",
+      from: process.env.SMTP_NO_REPLY,
       to: to,
       subject: subject,
       html: content
@@ -106,23 +112,26 @@ async function sendEmail(to, subject, content) {
   }
 }
 
-async function sendVerificationEmail(emai, token){
-  const cerifyUrl = `${process.env.APP_BASE_URL}/api/user/verify-email?token=${token}`;
+async function sendVerificationEmail(user){
+  emailVerificationToken = makeToken();
+  emailVerificationExpiration = makeExpiration(0, 24);
 
-  const message = {
-    from: process.env.EMAIL_FROM,
-    to: email,
-    subject: 'Verify your email',
-    text: `Welcome! Verify your email by visiting this link: ${verifyUrl}`,
-    html: `
-      <p>Welcome!</p>
-      <p>Please verify your email by clicking the link below:</p>
-      <p><a href=${verifyUrl}">${verifyUrl}</a></p>
-      <p>This link expires in 24 hours.</p>
-    `
-  };
+  // save verification details
+  await users.updateOne(
+      { _id: user._id },
+      { $set: 
+        {
+          emailVerificationToken: emailVerificationToken,
+          emailVerificationExpiration: emailVerificationExpiration
+        }
+       }
+    );
 
-  await mailTransporter.sendMail(message);
+  var cerifyUrl = `${process.env.APP_BASE_URL}/api/user/verify-email?token=${emailVerificationToken}`;
+
+  var content = "Welcome to Collector’s Pair-A-Dice! Pleaase verify your email with this link: " + cerifyUrl
+
+  await sendEmail(user.email, "Please Verify Your Email", content)
 }
 
 //#endregion
@@ -754,7 +763,7 @@ app.post('/api/tags', async (req, res) => {
 
 //#region == User Operations ==
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/user/register', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -780,18 +789,12 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    const emailVerificationToken = makeEmailVerificationToke();
-    const emailVerificationExpiration = makeEmailVerificationExpiration();
-
-    // const sessionToken = makeSessionToken();
-    // const sessionExpiration = makeSessionExpiration();
-
     const newUser = {
       email,
       password,
       isVerified: false,
-      emailVerificationToken,
-      emailVerificationExpiration,
+      emailVerificationToken: null,
+      emailVerificationExpiration: null,
       sessionToken: null,
       sessionExpiration: null,
       passwordResetToken: null,
@@ -800,11 +803,14 @@ app.post('/api/register', async (req, res) => {
 
     const result = await users.insertOne(newUser);
 
+    const createdUser = await users.findOne({ _id: result.insertedId });
+    await sendVerificationEmail(createdUser);
+
     return res.status(200).json({
       id: result.insertedId.toString(),
       email,
-      sessionToken,
-      sessionExpiration,
+      sessionToken: '',
+      sessionExpiration: '',
       error: ''
     });
   } catch (err) {
@@ -818,7 +824,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/user/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -854,8 +860,8 @@ app.post('/api/login', async (req, res) => {
       });
     }
 
-    const sessionToken = makeToken();
-    const sessionExpiration = makeExpiration(7, 0);
+    var sessionToken = makeToken();
+    var sessionExpiration = makeExpiration(7, 0);
 
     await users.updateOne(
       { _id: user._id },
@@ -870,8 +876,8 @@ app.post('/api/login', async (req, res) => {
     return res.status(200).json({
       id: user._id.toString(),
       email: user.email,
-      sessionToken,
-      sessionExpiration,
+      sessionToken: sessionToken,
+      sessionExpiration: sessionExpiration,
       error: ''
     });
   } catch (err) {
@@ -884,6 +890,17 @@ app.post('/api/login', async (req, res) => {
     });
   }
 });
+
+app.get('/api/user/request-email-verification', async(req, res) => {
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  await sendVerificationEmail(user)
+
+  return res.status(200);
+})
 
 app.get('/api/user/verify-email', async(req, res) =>{
   const { token } = req.query;
@@ -903,7 +920,7 @@ app.get('/api/user/verify-email', async(req, res) =>{
       return res.status(400).send('Verification token has expired');
     }
 
-    await usurs.updateOne(
+    await users.updateOne(
       { _id: user._id },
       {
         $set : {
@@ -923,7 +940,7 @@ app.get('/api/user/verify-email', async(req, res) =>{
 });
 
 // request password reset
-app.post('/api/user/reset', async (req, res) => {
+app.post('/api/user/request-password-reset', async (req, res) => {
 
 })
 
@@ -945,18 +962,6 @@ async function startServer() {
   items = db.collection('items');
   collectionItems = db.collection('collection_items');
 
-  mailTransporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  });
-
-  await mailTransporter.verify();
-  console.log('SMTP server is ready to take messages');
   app.listen(5000, () => {
     console.log('Server running on port 5000');
   });
