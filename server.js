@@ -114,15 +114,13 @@ async function sendEmail(to, subject, content) {
 
 async function sendVerificationEmail(user){
   emailVerificationToken = makeToken();
-  emailVerificationExpiration = makeExpiration(0, 24);
 
   // save verification details
   await users.updateOne(
       { _id: user._id },
       { $set: 
         {
-          emailVerificationToken: emailVerificationToken,
-          emailVerificationExpiration: emailVerificationExpiration
+          emailVerificationToken: emailVerificationToken
         }
        }
     );
@@ -794,7 +792,6 @@ app.post('/api/user/register', async (req, res) => {
       password,
       isVerified: false,
       emailVerificationToken: null,
-      emailVerificationExpiration: null,
       sessionToken: null,
       sessionExpiration: null,
       passwordResetToken: null,
@@ -891,17 +888,6 @@ app.post('/api/user/login', async (req, res) => {
   }
 });
 
-app.get('/api/user/request-email-verification', async(req, res) => {
-  var [res, isAuthd, user] = await isUserAuthd(req, res);
-  if (!isAuthd) {
-    return res;
-  }
-
-  await sendVerificationEmail(user)
-
-  return res.status(200);
-})
-
 app.get('/api/user/verify-email', async(req, res) =>{
   const { token } = req.query;
 
@@ -916,10 +902,6 @@ app.get('/api/user/verify-email', async(req, res) =>{
       return res.status(400).send('Invalid verification token');
     }
 
-    if(!user.emailVerificationExpiration || new Date() >= user.emailVerificationExpiration) {
-      return res.status(400).send('Verification token has expired');
-    }
-
     await users.updateOne(
       { _id: user._id },
       {
@@ -928,7 +910,6 @@ app.get('/api/user/verify-email', async(req, res) =>{
         },
         $unset: {
           emailVerificationToken: "",
-          emailVerificationExpiration: ""
         }
       }
     );
