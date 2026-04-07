@@ -532,7 +532,6 @@ app.get('/api/collections', async (req, res) => {
 
 //#region == CRUD Operations for Items ==
 
-
 // get existing item
 app.get('/api/items', async (req, res) => {
   // ensure user is authenticated
@@ -741,6 +740,83 @@ app.delete('/api/items', async (req, res) => {
     });
   }
 })
+
+//#endregion
+
+//#region == Search API ==
+
+app.get('/api/search/items', async(req, res) => {
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if(!isAuthd){
+    return res;
+  }
+
+  var { search, categoryId } = req.query;
+
+  if(!search){
+    return res.status(400).json({
+      items: [],
+      error: 'Missing search term'
+    });
+  }
+
+  try {
+    var regex = new RegExp(search, 'i');
+
+    var itemNameMatchesQuers = {
+      userId: user._id,
+      itemName: { $regex: regex }
+    };
+
+    if(categoryId) {
+      itemNameMatchesQuery.categoryId = new mongodb.ObjectId(categoryId);
+    }
+
+    var itemNameMatches = await items.find(itemNameMatchesQuery).toArray();
+
+    var criteriaValueMatches = await itemCriteria.find({
+      criteriaValue: { $regex: regex }
+    }).toArray();
+
+    var criteriaItemIds = criteriaValueMatches.map(x => x.itemId);
+
+    var matchedByCriteria = [];
+
+    if(criteriaItemIds.length > 0) {
+      var criteriaItemQuery = {
+        userId: user._id,
+        _id: { $in: criteriaItemIds }
+      };
+
+      if(categoryId) {
+        criteriaItemQuery.categoryId = new mongodb.ObjectId(categoryId);
+      }
+      
+      matchedByCriteria = await items.find(criteriaItemQuery).toArray();
+    }
+
+    var mergedMap = new Map();
+
+    for(var item of itemNameMatches) {
+      mergedMap.set(item._id.toString(), item);
+    }
+
+    for(var item of matchedByCriteria) {
+      mergedMap.set(item._id.toString(), item);
+    }
+
+    return res.status(200).json({
+      items: Array.from(mergedMap.values()),
+      error: ''
+    });
+  
+  } catch (err) {
+    return res.status(500).json({
+      items: [],
+      error: err.toString()
+    });
+  }
+});
 
 //#endregion
 
