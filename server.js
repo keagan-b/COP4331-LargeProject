@@ -54,7 +54,7 @@ async function isUserAuthd(req, res) {
       });
       isAuthd = false;
     }
-    else if (user.is_verified == false) {
+    else if (user.isVerified == false) {
       res.status(403).json({
         error: 'Email not verified'
       });
@@ -130,6 +130,10 @@ async function sendVerificationEmail(user){
   var content = "Welcome to Collector’s Pair-A-Dice! Please verify your email with this link: " + cerifyUrl
 
   await sendEmail(user.email, "Please Verify Your Email", content)
+}
+
+function hashPassword(password) {
+  return crypto.createHash('md5').update(password).digest('hex');
 }
 
 //#endregion
@@ -789,7 +793,7 @@ app.post('/api/user/register', async (req, res) => {
 
     const newUser = {
       email,
-      password,
+      password: hashPassword(password),
       isVerified: false,
       emailVerificationToken: null,
       sessionToken: null,
@@ -835,7 +839,9 @@ app.post('/api/user/login', async (req, res) => {
   }
 
   try {
-    const user = await users.findOne({ email: email, password: password });
+    const hashedPassword = hashPassword(password)
+
+    const user = await users.findOne({ email: email, password: hashedPassword });
 
     if (!user) {
       return res.status(401).json({
@@ -860,7 +866,7 @@ app.post('/api/user/login', async (req, res) => {
     var currentTime = new Date();
 
     // ensure token is still valid, replace if not
-    if (currentTime >= user.sessionExpiration) {
+    if (!sessionToken || !sessionExpiration || currentTime >= user.sessionExpiration) {
       var sessionToken = makeToken();
       var sessionExpiration = makeExpiration(7, 0);
 
