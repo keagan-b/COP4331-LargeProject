@@ -54,7 +54,7 @@ async function isUserAuthd(req, res) {
       });
       isAuthd = false;
     }
-    else if (user.is_verified == false) {
+    else if (user.isVerified == false) {
       res.status(403).json({
         error: 'Email not verified'
       });
@@ -130,6 +130,10 @@ async function sendVerificationEmail(user){
   var content = "Welcome to Collector’s Pair-A-Dice! Please verify your email with this link: " + cerifyUrl
 
   await sendEmail(user.email, "Please Verify Your Email", content)
+}
+
+function hashPassword(password) {
+  return crypto.createHash('md5').update(password).digest('hex');
 }
 
 //#endregion
@@ -528,7 +532,6 @@ app.get('/api/collections', async (req, res) => {
 
 //#region == CRUD Operations for Items ==
 
-
 // get existing item
 app.get('/api/items', async (req, res) => {
   // ensure user is authenticated
@@ -746,64 +749,192 @@ app.delete('/api/items', async (req, res) => {
 
 //#endregion
 
-//#region == CRUD Operations for Category criteria ==
+//#region == Search API ==
 
-// get existing category criteria
-app.get('/api/categories/criteria', async (req, res) => {
-  // ensure user is authenticated
+app.post('/api/search/items', async (req, res) => {
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
     return res;
   }
 
-  try {
-  var criteriaId = req.query.criteriaId;
-  } catch (err) {
-    return req.status(400).json({
-      error: 'Missing required fields.'
-    })
-  }
+  var { category, categoryId, criteria, generalSearch } = req.body;
 
-  // find specified criteria
-  try {
-    var criteria = await categoryCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(criteriaId)}, {projection: {userId: 0}});
-  }
-  catch (err) {
+  // allow either "category" or "categoryId"
+  var finalCategoryId = categoryId || category;
+
+  if (!finalCategoryId) {
     return res.status(400).json({
-      success: false,
-      error: 'Invalid category criteria ID'
-    })
+      items: [],
+      error: 'Missing category ID'
+    });
   }
 
-  // check if criteria is null & user has permission to edit it
   if (!criteria) {
+    criteria = {};
+  }
+
+  if (typeof criteria !== 'object' || Array.isArray(criteria)) {
     return res.status(400).json({
-      item: {},
-      error: 'Category criteria not found, or lacking permissions.'
-    })
+      items: [],
+      error: 'criteria must be an object'
+    });
   }
 
-  return res.status(200).json({
-    criteria: criteria,
-    error: ''
-  })
-})
+  try {
+    // 1) validate category and ownership
+    var foundCategory = await categories.findOne({
+      _id: new mongodb.ObjectId(finalCategoryId)
+    });
 
-// update category criteria
-app.patch('/api/categories/criteria', async (req, res) => {
-  // ensure user is authenticated
-  var [res, isAuthd, user] = await isUserAuthd(req, res);
-  if (!isAuthd) {
-    return res;
+    if (!foundCategory || !foundCategory.userId.equals(user._id)) {
+      return res.status(400).json({
+        items: [],
+        error: 'Category not found, or lacking permissions.'
+      });
+    }
+
+    // 2) start with all item IDs in this category owned by this user
+    var categoryItems = await items.find({
+      userId: user._id,
+      categoryId: foundCategory._id
+    }).toArray();
+
+    var allowedItemIds = categoryItems.map(item => item._id);
+
+    // if category has no items, stop early
+    if (allowedItemIds.length === 0) {
+      return res.status(200).json({
+        items: [],
+        error: ''
+      });
+    }
+
+    // helper to compare ObjectIds using strings
+    function intersectObjectIdArrays(arr1, arr2) {
+      var set2 = new Set(arr2.map(x => x.toString()));
+      return arr1.filter(x => set2.has(x.toString()));
+    }
+
+    // 3) apply each specific criteria filter as an AND filter
+    for (const [criteriaId, criteriaSearchValue] of Object.entries(criteria)) {
+      if (
+        criteriaSearchValue === null ||
+        criteriaSearchValue === undefined ||
+        criteriaSearchValue === ''
+      ) {
+        continue;
+      }
+
+      var foundCategoryCriteria = await categoryCriteria.findOne({
+        _id: new mongodb.ObjectId(criteriaId)
+      });
+
+      if (!foundCategoryCriteria) {
+        return res.status(400).json({
+          items: [],
+          error: `Invalid category criteria ID: ${criteriaId}`
+        });
+      }
+
+      // make sure this criteria belongs to the chosen category
+      if (!foundCategoryCriteria.categoryId.equals(foundCategory._id)) {
+        return res.status(400).json({
+          items: [],
+          error: `Criteria ${criteriaId} does not belong to the selected category`
+        });
+      }
+
+      var regex = new RegExp(criteriaSearchValue, 'i');
+
+      var matchingItemCriteria = await itemCriteria.find({
+        categoryCriteriaId: foundCategoryCriteria._id,
+        criteriaValue: { $regex: regex },
+        itemId: { $in: allowedItemIds }
+      }).toArray();
+
+      var matchedItemIdsForThisCriteria = matchingItemCriteria.map(x => x.itemId);
+
+      allowedItemIds = intersectObjectIdArrays(allowedItemIds, matchedItemIdsForThisCriteria);
+
+      if (allowedItemIds.length === 0) {
+        return res.status(200).json({
+          items: [],
+          error: ''
+        });
+      }
+    }
+
+    // 4) apply generalSearch, if present
+    if (generalSearch && generalSearch.trim() !== '') {
+      var generalRegex = new RegExp(generalSearch, 'i');
+
+      // item name matches
+      var itemNameMatches = await items.find({
+        _id: { $in: allowedItemIds },
+        userId: user._id,
+        categoryId: foundCategory._id,
+        itemName: { $regex: generalRegex }
+      }).toArray();
+
+      var itemNameMatchIds = itemNameMatches.map(x => x._id);
+
+      // criteria value matches
+      var criteriaMatches = await itemCriteria.find({
+        itemId: { $in: allowedItemIds },
+        criteriaValue: { $regex: generalRegex }
+      }).toArray();
+
+      var criteriaMatchIds = criteriaMatches.map(x => x.itemId);
+
+      // union of generalSearch matches
+      var generalMatchIdMap = new Map();
+
+      for (var id of itemNameMatchIds) {
+        generalMatchIdMap.set(id.toString(), id);
+      }
+
+      for (var id of criteriaMatchIds) {
+        generalMatchIdMap.set(id.toString(), id);
+      }
+
+      var generalMatchedIds = Array.from(generalMatchIdMap.values());
+
+      allowedItemIds = intersectObjectIdArrays(allowedItemIds, generalMatchedIds);
+
+      if (allowedItemIds.length === 0) {
+        return res.status(200).json({
+          items: [],
+          error: ''
+        });
+      }
+    }
+
+    // 5) fetch final matching items
+    var finalItems = await items.find({
+      _id: { $in: allowedItemIds },
+      userId: user._id,
+      categoryId: foundCategory._id
+    }).toArray();
+
+    return res.status(200).json({
+      items: finalItems,
+      error: ''
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      items: [],
+      error: err.toString()
+    });
   }
+});
 
-  var { criteriaId, criteriaName } = req.body;
+//#endregion
 
-  if (!criteriaId || !criteriaName) {
-    return res.status(400).json({
-      error: 'Missing required fields'
-    })
-  }
+//#region == CRUD Operations for Category Criteria ==
+
+// get existing tags
+app.get('/api/categories/criteria', async (req, res) => {
 
   // get item
   try {
@@ -1218,7 +1349,7 @@ app.post('/api/user/register', async (req, res) => {
 
     const newUser = {
       email,
-      password,
+      password: hashPassword(password),
       isVerified: false,
       emailVerificationToken: null,
       sessionToken: null,
@@ -1264,7 +1395,9 @@ app.post('/api/user/login', async (req, res) => {
   }
 
   try {
-    const user = await users.findOne({ email: email, password: password });
+    const hashedPassword = hashPassword(password)
+
+    const user = await users.findOne({ email: email, password: hashedPassword });
 
     if (!user) {
       return res.status(401).json({
@@ -1425,7 +1558,7 @@ app.put('/api/user/reset-password', async (req, res) => {
         sessionExpiration: null,
         passwordResetToken: null,
         passwordResetExpiration: null,
-        password: newPassword
+        password: hashPassword(newPassword)
       }
     }
   )
@@ -1441,6 +1574,7 @@ app.put('/api/user/reset-password', async (req, res) => {
 async function startServer() {
   await client.connect();
   db = client.db('collections_db');
+  
   users = db.collection('users');
   collections = db.collection('collections');
   categories = db.collection('categories');
