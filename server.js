@@ -314,7 +314,7 @@ app.get('/api/categories/items', async (req, res) => {
   try {
     var categoryId = req.query.categoryId;
   } catch (err) {
-    return req.status(400).json({
+    return res.status(400).json({
       error: 'Missing required fields.'
     })
   }
@@ -353,11 +353,6 @@ app.get('/api/categories/items', async (req, res) => {
       error: err.toString()
     });
   }
-
-  return
-
-
-
 })
 
 //#endregion
@@ -375,7 +370,7 @@ app.post('/api/collections', async (req, res) => {
   var { categoryId, collectionName } = req.body;
 
   if (!collectionName) {
-    return req.status(400).json({
+    return res.status(400).json({
       error: 'Missing required fields.'
     });
   }
@@ -511,22 +506,21 @@ app.get('/api/collections', async (req, res) => {
   if (!isAuthd) {
     return res;
   }
-  
-  // find collections matching user data
-  const collections = await collections.find({ userId: user._id })
 
-  // no collections found, return empty array
-  if (!collections) {
-    collections = []
+  try {
+    var foundCollections = await collections.find({ userId: user._id }).toArray();
+
+    return res.status(200).json({
+      collections: foundCollections,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      collections: [],
+      error: err.toString()
+    });
   }
-
-  // return found collections
-  return res.status(200).json({
-    collections: collections,
-    error: ''
-  })
-
-})
+});
 
 //#endregion
 
@@ -709,30 +703,17 @@ app.delete('/api/items', async (req, res) => {
 
   // get category
   try {
-    await collectionItems.deleteMany({ itemId: item._id });
-    await items.deleteOne({ _id: item._id });
     var item = await items.findOne({ _id: new mongodb.ObjectId(itemId) }); 
 
-    return res.status(200).json({
-      success: true,
-      error: ''
-    })
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: err.toString()
-    })
-  }
+    if(!item || !item.userId.equals(user._id)){
+      return res.status(400).json({
+        success: false,
+        error: 'Item not found, or lacking permissions'
+      });
+    }
 
-  // check if category is null & user has permission to remove it
-  if (!item || !item.userId.equals(user._id)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Item not found, or lacking permissions'
-    })
-  }
-
-  try {
+    await collectionItems.deleteMany({ itemId: item._id });
+    await itemCriteria.deleteMany({ itemId: item._id });
     await items.deleteOne({ _id: item._id });
 
     return res.status(200).json({
@@ -742,10 +723,10 @@ app.delete('/api/items', async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       success: false,
-      error: err.toString()
+      error: 'Invalid item ID'
     });
   }
-})
+});
 
 //#endregion
 
@@ -935,48 +916,47 @@ app.post('/api/search/items', async (req, res) => {
 
 // get existing tags
 app.get('/api/categories/criteria', async (req, res) => {
-
-  // get item
-  try {
-    var criteria = await categoryCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
   }
-  catch (err) {
+
+  var { categoryId } = req.query;
+
+  if (!categoryId) {
     return res.status(400).json({
-      success: false,
-      error: 'Invalid category criteria ID'
-    })
+      criteria: [],
+      error: 'Missing required fields.'
+    });
   }
 
-  // check if category is null & user has permission to edit it
-  if (!criteria || !criteria.userId.equals(user._id)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Category criteria not found, or lacking permissions.'
-    })
-  }
-
-  // update category
   try {
-    await categoryCriteria.updateOne(
-      { _id: criteria._id },
-      {
-        $set: {
-          criteriaName: criteriaName
-        }
-      }
-    );
+    var category = await categories.findOne({
+      _id: new mongodb.ObjectId(categoryId)
+    });
+
+    if (!category || !category.userId.equals(user._id)) {
+      return res.status(400).json({
+        criteria: [],
+        error: 'Category not found, or lacking permissions.'
+      });
+    }
+
+    var criteria = await categoryCriteria.find({
+      categoryId: category._id
+    }).toArray();
 
     return res.status(200).json({
-      success: true,
+      criteria: criteria,
       error: ''
     });
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: err.toString()
+    return res.status(400).json({
+      criteria: [],
+      error: 'Invalid category ID'
     });
   }
-})
+});
 
 // add category criteria
 app.post('/api/categories/criteria', async (req, res) => {
@@ -1064,6 +1044,7 @@ app.delete('/api/categories/criteria', async (req, res) => {
   }
 
   try {
+    await itemCriteria.deleteMany({ categoryCriteriaId: criteria._id })
     await categoryCriteria.deleteOne({ _id: criteria._id });
 
     return res.status(200).json({
@@ -1077,6 +1058,53 @@ app.delete('/api/categories/criteria', async (req, res) => {
     });
   }
 })
+
+app.patch('/api/categories/criteria', async (req, res) => {
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { criteriaId, criteriaName } = req.body;
+
+  if (!criteriaId || !criteriaName) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    });
+  }
+
+  try {
+    var criteria = await categoryCriteria.findOne({
+      _id: new mongodb.ObjectId(criteriaId)
+    });
+
+    if (!criteria || !criteria.userId.equals(user._id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Category criteria not found, or lacking permissions.'
+      });
+    }
+
+    await categoryCriteria.updateOne(
+      { _id: criteria._id },
+      {
+        $set: {
+          criteriaName: criteriaName
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category criteria ID'
+    });
+  }
+});
 
 //#endregion
 
@@ -1506,7 +1534,7 @@ app.get('/api/user/request-password-reset', async (req, res) => {
       {
         $set : {
           passwordResetToken: passwordResetToken,
-          passwordResetExpiration, passwordResetExpiration
+          passwordResetExpiration: passwordResetExpiration
         }
       }
     )
