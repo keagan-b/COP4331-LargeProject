@@ -642,7 +642,7 @@ app.patch('/api/items', async (req, res) => {
 
 // add items
 app.post('/api/items', async (req, res) => {
-// ensure user is authenticated
+  // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
     return res;
@@ -746,7 +746,7 @@ app.delete('/api/items', async (req, res) => {
 
 //#endregion
 
-//#region == CRUD Operations for category criteria ==
+//#region == CRUD Operations for Category criteria ==
 
 // get existing category criteria
 app.get('/api/categories/criteria', async (req, res) => {
@@ -776,15 +776,15 @@ app.get('/api/categories/criteria', async (req, res) => {
   }
 
   // check if criteria is null & user has permission to edit it
-  if (!item) {
+  if (!criteria) {
     return res.status(400).json({
       item: {},
-      error: 'category criteria not found, or lacking permissions.'
+      error: 'Category criteria not found, or lacking permissions.'
     })
   }
 
   return res.status(200).json({
-    item: item,
+    criteria: criteria,
     error: ''
   })
 })
@@ -797,7 +797,7 @@ app.patch('/api/categories/criteria', async (req, res) => {
     return res;
   }
 
-  var { categoryId, criteriaName } = req.body;
+  var { criteriaId, criteriaName } = req.body;
 
   if (!criteriaId || !criteriaName) {
     return res.status(400).json({
@@ -881,7 +881,7 @@ app.post('/api/categories/criteria', async (req, res) => {
 
     return res.status(200).json({
       _id: result.insertedId.toString(),
-      categoryname: categoryName,
+      categoryname: criteriaName,
       categoryId: categoryId,
       error: ''
     });
@@ -896,7 +896,7 @@ app.post('/api/categories/criteria', async (req, res) => {
 })
 
 // delete category criteria
-app.delete('api/categories/criteria', async (req, res) => {
+app.delete('/api/categories/criteria', async (req, res) => {
   // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
@@ -911,7 +911,9 @@ app.delete('api/categories/criteria', async (req, res) => {
     })
   }
 
-  // get category
+  console.log("found criteria id")
+
+  // get criteria
   try {
     var criteria = await categoryCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
   }
@@ -944,6 +946,245 @@ app.delete('api/categories/criteria', async (req, res) => {
     });
   }
 })
+
+//#endregion
+
+//#region == CRUD Operations for Item criteria
+
+// get item criteria
+app.get('/api/items/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  try {
+  var itemCriteriaId = req.query.itemCriteriaId;
+  } catch (err) {
+    return req.status(400).json({
+      error: 'Missing required fields.'
+    })
+  }
+
+  // find specified criteria
+  try {
+    var criteria = await itemCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(itemCriteriaId)}, {projection: {userId: 0}});
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid item criteria ID'
+    })
+  }
+
+  // check if criteria is null & user has permission to edit it
+  if (!criteria) {
+    return res.status(400).json({
+      criteria: {},
+      error: 'Item criteria not found, or lacking permissions.'
+    })
+  }
+
+  return res.status(200).json({
+    itemCriteria: criteria,
+    error: ''
+  })
+});
+
+// add new item criteria
+app.post('/api/items/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { itemId, criteriaId, value } = req.body;
+
+  if (!itemId || !criteriaId || !value) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    });
+  }
+  
+  // ensure item exists
+  try {
+    var item = await items.findOne({userId: user._id, _id: new mongodb.ObjectId(itemId)}, {projection: {userId: 0}});
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid item ID'
+    })
+  }
+
+  // ensure criteria exists
+  try {
+    var criteria = await categoryCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(criteriaId)}, {projection: {userId: 0}});
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid criteria ID'
+    })
+  }  
+
+  if (!item || !criteria) {
+    return res.status(400).json({
+      success: false,
+      error: 'Item or Criteria not found or missing permission'
+    })
+  }
+
+  // ensure item is in the same category as the criteria
+  if (item.categoryId.toString() != criteria.categoryId.toString()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Item does not match criteria category'
+    })
+  }
+
+  try {
+    var newItemCriteria = {
+      userId: user._id,
+      itemId: new mongodb.ObjectId(itemId),
+      criteriaId: new mongodb.ObjectId(criteriaId),
+      value: value
+  };
+  } catch (err) {
+    return res.status(400).json({
+      itemCriteria: "",
+      itemId: "",
+      criteriaId: "",
+      error: "Invalid category ID"
+    })
+  }
+  try {
+    var result = await itemCriteria.insertOne(newItemCriteria);
+
+    return res.status(200).json({
+      _id: result.insertedId.toString(),
+      value: value,
+      itemId: itemId,
+      criteriaId: criteriaId,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.toString()
+    });
+  }
+});
+
+// delete item criteria
+app.delete('/api/items/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { criteriaId } = req.body;
+
+  if (!criteriaId) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get criteria
+  try {
+    var criteria = await itemCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category criteria ID'
+    })
+  }
+
+  // check if category is null & user has permission to remove it
+  if (!criteria || !criteria.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Item criteria not found, or lacking permissions'
+    })
+  }
+
+  try {
+    await itemCriteria.deleteOne({ _id: criteria._id });
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
+});
+
+// update item criteria
+app.patch('/api/items/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { criteriaId, value } = req.body;
+
+  if (!criteriaId || !value) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get item
+  try {
+    var criteria = await itemCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category criteria ID'
+    })
+  }
+
+  // check if category is null & user has permission to edit it
+  if (!criteria || !criteria.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Category criteria not found, or lacking permissions.'
+    })
+  }
+
+  // update category
+  try {
+    await itemCriteria.updateOne(
+      { _id: criteria._id },
+      {
+        $set: {
+          value: value
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
+});
+
 
 //#endregion
 
@@ -1045,12 +1286,15 @@ app.post('/api/user/login', async (req, res) => {
       });
     }
 
+    var sessionToken = user.sessionToken;
+    var sessionExpiration = user.sessionExpiration;
+
     var currentTime = new Date();
 
     // ensure token is still valid, replace if not
     if (currentTime >= user.sessionExpiration) {
-      var sessionToken = makeToken();
-      var sessionExpiration = makeExpiration(7, 0);
+      sessionToken = makeToken();
+      sessionExpiration = makeExpiration(7, 0);
 
       await users.updateOne(
         { _id: user._id },
