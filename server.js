@@ -745,71 +745,176 @@ app.delete('/api/items', async (req, res) => {
 
 //#region == Search API ==
 
-app.get('/api/search/items', async(req, res) => {
+app.post('/api/search/items', async (req, res) => {
   var [res, isAuthd, user] = await isUserAuthd(req, res);
-  if(!isAuthd){
+  if (!isAuthd) {
     return res;
   }
 
-  var { search, categoryId } = req.query;
+  var { category, categoryId, criteria, generalSearch } = req.body;
 
-  if(!search){
+  // allow either "category" or "categoryId"
+  var finalCategoryId = categoryId || category;
+
+  if (!finalCategoryId) {
     return res.status(400).json({
       items: [],
-      error: 'Missing search term'
+      error: 'Missing category ID'
+    });
+  }
+
+  if (!criteria) {
+    criteria = {};
+  }
+
+  if (typeof criteria !== 'object' || Array.isArray(criteria)) {
+    return res.status(400).json({
+      items: [],
+      error: 'criteria must be an object'
     });
   }
 
   try {
-    var regex = new RegExp(search, 'i');
+    // 1) validate category and ownership
+    var foundCategory = await categories.findOne({
+      _id: new mongodb.ObjectId(finalCategoryId)
+    });
 
-    var itemNameMatchesQuers = {
-      userId: user._id,
-      itemName: { $regex: regex }
-    };
-
-    if(categoryId) {
-      itemNameMatchesQuery.categoryId = new mongodb.ObjectId(categoryId);
+    if (!foundCategory || !foundCategory.userId.equals(user._id)) {
+      return res.status(400).json({
+        items: [],
+        error: 'Category not found, or lacking permissions.'
+      });
     }
 
-    var itemNameMatches = await items.find(itemNameMatchesQuery).toArray();
-
-    var criteriaValueMatches = await itemCriteria.find({
-      criteriaValue: { $regex: regex }
+    // 2) start with all item IDs in this category owned by this user
+    var categoryItems = await items.find({
+      userId: user._id,
+      categoryId: foundCategory._id
     }).toArray();
 
-    var criteriaItemIds = criteriaValueMatches.map(x => x.itemId);
+    var allowedItemIds = categoryItems.map(item => item._id);
 
-    var matchedByCriteria = [];
+    // if category has no items, stop early
+    if (allowedItemIds.length === 0) {
+      return res.status(200).json({
+        items: [],
+        error: ''
+      });
+    }
 
-    if(criteriaItemIds.length > 0) {
-      var criteriaItemQuery = {
-        userId: user._id,
-        _id: { $in: criteriaItemIds }
-      };
+    // helper to compare ObjectIds using strings
+    function intersectObjectIdArrays(arr1, arr2) {
+      var set2 = new Set(arr2.map(x => x.toString()));
+      return arr1.filter(x => set2.has(x.toString()));
+    }
 
-      if(categoryId) {
-        criteriaItemQuery.categoryId = new mongodb.ObjectId(categoryId);
+    // 3) apply each specific criteria filter as an AND filter
+    for (const [criteriaId, criteriaSearchValue] of Object.entries(criteria)) {
+      if (
+        criteriaSearchValue === null ||
+        criteriaSearchValue === undefined ||
+        criteriaSearchValue === ''
+      ) {
+        continue;
       }
-      
-      matchedByCriteria = await items.find(criteriaItemQuery).toArray();
+
+      var foundCategoryCriteria = await categoryCriteria.findOne({
+        _id: new mongodb.ObjectId(criteriaId)
+      });
+
+      if (!foundCategoryCriteria) {
+        return res.status(400).json({
+          items: [],
+          error: `Invalid category criteria ID: ${criteriaId}`
+        });
+      }
+
+      // make sure this criteria belongs to the chosen category
+      if (!foundCategoryCriteria.categoryId.equals(foundCategory._id)) {
+        return res.status(400).json({
+          items: [],
+          error: `Criteria ${criteriaId} does not belong to the selected category`
+        });
+      }
+
+      var regex = new RegExp(criteriaSearchValue, 'i');
+
+      var matchingItemCriteria = await itemCriteria.find({
+        categoryCriteriaId: foundCategoryCriteria._id,
+        criteriaValue: { $regex: regex },
+        itemId: { $in: allowedItemIds }
+      }).toArray();
+
+      var matchedItemIdsForThisCriteria = matchingItemCriteria.map(x => x.itemId);
+
+      allowedItemIds = intersectObjectIdArrays(allowedItemIds, matchedItemIdsForThisCriteria);
+
+      if (allowedItemIds.length === 0) {
+        return res.status(200).json({
+          items: [],
+          error: ''
+        });
+      }
     }
 
-    var mergedMap = new Map();
+    // 4) apply generalSearch, if present
+    if (generalSearch && generalSearch.trim() !== '') {
+      var generalRegex = new RegExp(generalSearch, 'i');
 
-    for(var item of itemNameMatches) {
-      mergedMap.set(item._id.toString(), item);
+      // item name matches
+      var itemNameMatches = await items.find({
+        _id: { $in: allowedItemIds },
+        userId: user._id,
+        categoryId: foundCategory._id,
+        itemName: { $regex: generalRegex }
+      }).toArray();
+
+      var itemNameMatchIds = itemNameMatches.map(x => x._id);
+
+      // criteria value matches
+      var criteriaMatches = await itemCriteria.find({
+        itemId: { $in: allowedItemIds },
+        criteriaValue: { $regex: generalRegex }
+      }).toArray();
+
+      var criteriaMatchIds = criteriaMatches.map(x => x.itemId);
+
+      // union of generalSearch matches
+      var generalMatchIdMap = new Map();
+
+      for (var id of itemNameMatchIds) {
+        generalMatchIdMap.set(id.toString(), id);
+      }
+
+      for (var id of criteriaMatchIds) {
+        generalMatchIdMap.set(id.toString(), id);
+      }
+
+      var generalMatchedIds = Array.from(generalMatchIdMap.values());
+
+      allowedItemIds = intersectObjectIdArrays(allowedItemIds, generalMatchedIds);
+
+      if (allowedItemIds.length === 0) {
+        return res.status(200).json({
+          items: [],
+          error: ''
+        });
+      }
     }
 
-    for(var item of matchedByCriteria) {
-      mergedMap.set(item._id.toString(), item);
-    }
+    // 5) fetch final matching items
+    var finalItems = await items.find({
+      _id: { $in: allowedItemIds },
+      userId: user._id,
+      categoryId: foundCategory._id
+    }).toArray();
 
     return res.status(200).json({
-      items: Array.from(mergedMap.values()),
+      items: finalItems,
       error: ''
     });
-  
+
   } catch (err) {
     return res.status(500).json({
       items: [],
@@ -820,10 +925,10 @@ app.get('/api/search/items', async(req, res) => {
 
 //#endregion
 
-//#region == CRUD Operations for Tags ==
+//#region == CRUD Operations for Category Criteria ==
 
 // get existing tags
-app.get('/api/tags', async (req, res) => {
+app.get('/api/categories/criteria', async (req, res) => {
 
 })
 
@@ -1075,7 +1180,7 @@ app.put('/api/user/reset-password', async (req, res) => {
         sessionExpiration: null,
         passwordResetToken: null,
         passwordResetExpiration: null,
-        password: newPassword
+        password: hashPassword(newPassword)
       }
     }
   )
@@ -1091,11 +1196,14 @@ app.put('/api/user/reset-password', async (req, res) => {
 async function startServer() {
   await client.connect();
   db = client.db('collections_db');
+  
   users = db.collection('users');
   collections = db.collection('collections');
   categories = db.collection('categories');
   items = db.collection('items');
   collectionItems = db.collection('collection_items');
+  categoryCriteria = db.collection('category_criteria');
+  itemCriteria = db.collection('item_criteria');
 
   app.listen(5000, () => {
     console.log('Server running on port 5000');
