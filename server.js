@@ -1178,10 +1178,10 @@ app.post('/api/items/criteria', async (req, res) => {
 
   try {
     var newItemCriteria = {
-      userId: user._id,
-      itemId: new mongodb.ObjectId(itemId),
-      criteriaId: new mongodb.ObjectId(criteriaId),
-      value: value
+    userId: user._id,
+    itemId: new mongodb.ObjectId(itemId),
+    categoryCriteriaId: new mongodb.ObjectId(criteriaId),
+    criteriaValue: value
   };
   } catch (err) {
     return res.status(400).json({
@@ -1198,7 +1198,7 @@ app.post('/api/items/criteria', async (req, res) => {
       _id: result.insertedId.toString(),
       value: value,
       itemId: itemId,
-      criteriaId: criteriaId,
+      categoryCriteriaId: criteriaId,
       error: ''
     });
   } catch (err) {
@@ -1299,7 +1299,7 @@ app.patch('/api/items/criteria', async (req, res) => {
       { _id: criteria._id },
       {
         $set: {
-          value: value
+          criteriaValue: value
         }
       }
     );
