@@ -113,7 +113,7 @@ async function sendEmail(to, subject, content) {
 }
 
 async function sendVerificationEmail(user){
-  emailVerificationToken = makeToken();
+  const emailVerificationToken = makeToken();
 
   // save verification details
   await users.updateOne(
@@ -369,16 +369,26 @@ app.post('/api/collections', async (req, res) => {
 
   var { categoryId, collectionName } = req.body;
 
-  if (!collectionName) {
+  if (!collectionName || !categoryId) {
     return res.status(400).json({
       error: 'Missing required fields.'
     });
   }
 
   try {
+    var category = await categories.findOne({
+      _id: new mongodb.ObjectId(categoryId)
+    });
+
+    if (!category || !category.userId.equals(user._id)) {
+      return res.status(400).json({
+        error: 'Category not found, or lacking permissions.'
+      });
+    }
+
     var newCollection = {
       userId: user._id,
-      categoryId: categoryId,
+      categoryId: category._id,
       collectionName: collectionName
     };
 
@@ -386,17 +396,19 @@ app.post('/api/collections', async (req, res) => {
 
     return res.status(200).json({
       id: result.insertedId.toString(),
-      collectionName: collectionName
+      collectionName: collectionName,
+      categoryId: category._id.toString(),
+      error: ''
     });
   } catch (err) {
-    return res.status(500).json({
+    return res.status(400).json({
       id: '',
       collectionName: '',
-      error: err.toString()
+      categoryId: '',
+      error: 'Invalid category ID'
     });
   }
-
-})
+});
 
 // remove collections
 app.delete('/api/collections', async (req, res) => {
@@ -583,7 +595,7 @@ app.patch('/api/items', async (req, res) => {
     })
   }
 
-  toUpdate = {}
+  let toUpdate = {};
 
   if (itemName) {toUpdate["itemName"] = itemName}
   if (categoryId) {
@@ -960,7 +972,6 @@ app.get('/api/categories/criteria', async (req, res) => {
 
 // add category criteria
 app.post('/api/categories/criteria', async (req, res) => {
-// ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
     return res;
@@ -973,38 +984,41 @@ app.post('/api/categories/criteria', async (req, res) => {
       error: 'Missing required fields.'
     });
   }
-  
+
   try {
+    var category = await categories.findOne({
+      _id: new mongodb.ObjectId(categoryId)
+    });
+
+    if (!category || !category.userId.equals(user._id)) {
+      return res.status(400).json({
+        error: 'Category not found, or lacking permissions.'
+      });
+    }
+
     var newCriteria = {
       userId: user._id,
-      categoryId: new mongodb.ObjectId(categoryId),
+      categoryId: category._id,
       criteriaName: criteriaName
     };
-  } catch (err) {
-    return res.status(400).json({
-      criteriaName: "",
-      categoryId: "",
-      error: "Invalid category ID"
-    })
-  }
-  try {
+
     var result = await categoryCriteria.insertOne(newCriteria);
 
     return res.status(200).json({
       _id: result.insertedId.toString(),
-      categoryname: criteriaName,
+      criteriaName: criteriaName,
       categoryId: categoryId,
       error: ''
     });
   } catch (err) {
-    return res.status(500).json({
+    return res.status(400).json({
       _id: '',
       criteriaName: '',
       categoryId: '',
-      error: err.toString()
+      error: 'Invalid category ID'
     });
   }
-})
+});
 
 // delete category criteria
 app.delete('/api/categories/criteria', async (req, res) => {
@@ -1447,13 +1461,12 @@ app.post('/api/user/login', async (req, res) => {
       });
     }
 
-    var sessionToken = user.sessionToken;
-    var sessionExpiration = user.sessionExpiration;
+    let sessionToken = user.sessionToken;
+    let sessionExpiration = user.sessionExpiration;
 
-    var currentTime = new Date();
+    const currentTime = new Date();
 
-    // ensure token is still valid, replace if not
-    if (currentTime >= user.sessionExpiration) {
+    if (!sessionToken || !sessionExpiration || currentTime >= sessionExpiration) {
       sessionToken = makeToken();
       sessionExpiration = makeExpiration(7, 0);
 
@@ -1464,7 +1477,8 @@ app.post('/api/user/login', async (req, res) => {
             sessionToken: sessionToken,
             sessionExpiration: sessionExpiration
           }
-        });
+        }
+      );
     }
 
     return res.status(200).json({
