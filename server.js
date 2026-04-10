@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mongodb = require('mongodb');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(cors());
@@ -17,13 +18,14 @@ let users;
 
 //#region == Utility Functions ==
 
-function makeSessionToken() {
+function makeToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function makeSessionExpiration() {
+function makeExpiration(delay_days, delay_hours) {
   const d = new Date();
-  d.setDate(d.getDate() + 7); // 7 days from now
+  d.setDate(d.getDate() + delay_days); // add delay as days from now
+  d.setHours(d.getHours() + delay_hours); // add delay as hours from now
   return d;
 }
 
@@ -52,6 +54,12 @@ async function isUserAuthd(req, res) {
       });
       isAuthd = false;
     }
+    else if (user.isVerified == false) {
+      res.status(403).json({
+        error: 'Email not verified'
+      });
+      isAuthd = false;
+    }
   }
 
   return [res, isAuthd, user];
@@ -73,6 +81,59 @@ async function getUserFromToken(token) {
   }
 
   return user;
+}
+
+async function sendEmail(to, subject, content) {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      },
+      tls: {
+        ciphers: "TLSv1.2"
+      }
+    });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_NO_REPLY,
+      to: to,
+      subject: subject,
+      html: content
+
+    })
+
+  }
+  catch (error) {
+    console.error("Error sending email:", error)
+  }
+}
+
+async function sendVerificationEmail(user){
+  const emailVerificationToken = makeToken();
+
+  // save verification details
+  await users.updateOne(
+      { _id: user._id },
+      { $set: 
+        {
+          emailVerificationToken: emailVerificationToken
+        }
+       }
+    );
+
+  var cerifyUrl = `${process.env.APP_BASE_URL}/api/user/verify-email?token=${emailVerificationToken}`;
+
+  var content = "Welcome to Collector’s Pair-A-Dice! Please verify your email with this link: " + cerifyUrl
+
+  await sendEmail(user.email, "Please Verify Your Email", content)
+}
+
+function hashPassword(password) {
+  return crypto.createHash('md5').update(password).digest('hex');
 }
 
 //#endregion
@@ -253,7 +314,7 @@ app.get('/api/categories/items', async (req, res) => {
   try {
     var categoryId = req.query.categoryId;
   } catch (err) {
-    return req.status(400).json({
+    return res.status(400).json({
       error: 'Missing required fields.'
     })
   }
@@ -292,11 +353,6 @@ app.get('/api/categories/items', async (req, res) => {
       error: err.toString()
     });
   }
-
-  return
-
-
-
 })
 
 //#endregion
@@ -313,16 +369,26 @@ app.post('/api/collections', async (req, res) => {
 
   var { categoryId, collectionName } = req.body;
 
-  if (!collectionName) {
-    return req.status(400).json({
+  if (!collectionName || !categoryId) {
+    return res.status(400).json({
       error: 'Missing required fields.'
     });
   }
 
   try {
+    var category = await categories.findOne({
+      _id: new mongodb.ObjectId(categoryId)
+    });
+
+    if (!category || !category.userId.equals(user._id)) {
+      return res.status(400).json({
+        error: 'Category not found, or lacking permissions.'
+      });
+    }
+
     var newCollection = {
       userId: user._id,
-      categoryId: categoryId,
+      categoryId: category._id,
       collectionName: collectionName
     };
 
@@ -330,17 +396,19 @@ app.post('/api/collections', async (req, res) => {
 
     return res.status(200).json({
       id: result.insertedId.toString(),
-      collectionName: collectionName
+      collectionName: collectionName,
+      categoryId: category._id.toString(),
+      error: ''
     });
   } catch (err) {
-    return res.status(500).json({
+    return res.status(400).json({
       id: '',
       collectionName: '',
-      error: err.toString()
+      categoryId: '',
+      error: 'Invalid category ID'
     });
   }
-
-})
+});
 
 // remove collections
 app.delete('/api/collections', async (req, res) => {
@@ -450,27 +518,25 @@ app.get('/api/collections', async (req, res) => {
   if (!isAuthd) {
     return res;
   }
-  
-  // find collections matching user data
-  const collections = await collections.find({ userId: user._id })
 
-  // no collections found, return empty array
-  if (!collections) {
-    collections = []
+  try {
+    var foundCollections = await collections.find({ userId: user._id }).toArray();
+
+    return res.status(200).json({
+      collections: foundCollections,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      collections: [],
+      error: err.toString()
+    });
   }
-
-  // return found collections
-  return res.status(200).json({
-    collections: collections,
-    error: ''
-  })
-
-})
+});
 
 //#endregion
 
 //#region == CRUD Operations for Items ==
-
 
 // get existing item
 app.get('/api/items', async (req, res) => {
@@ -529,7 +595,7 @@ app.patch('/api/items', async (req, res) => {
     })
   }
 
-  toUpdate = {}
+  let toUpdate = {};
 
   if (itemName) {toUpdate["itemName"] = itemName}
   if (categoryId) {
@@ -585,7 +651,7 @@ app.patch('/api/items', async (req, res) => {
 
 // add items
 app.post('/api/items', async (req, res) => {
-// ensure user is authenticated
+  // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
     return res;
@@ -649,30 +715,17 @@ app.delete('/api/items', async (req, res) => {
 
   // get category
   try {
-    await collectionItems.deleteMany({ itemId: item._id });
-    await items.deleteOne({ _id: item._id });
     var item = await items.findOne({ _id: new mongodb.ObjectId(itemId) }); 
 
-    return res.status(200).json({
-      success: true,
-      error: ''
-    })
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: err.toString()
-    })
-  }
+    if(!item || !item.userId.equals(user._id)){
+      return res.status(400).json({
+        success: false,
+        error: 'Item not found, or lacking permissions'
+      });
+    }
 
-  // check if category is null & user has permission to remove it
-  if (!item || !item.userId.equals(user._id)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Item not found, or lacking permissions'
-    })
-  }
-
-  try {
+    await collectionItems.deleteMany({ itemId: item._id });
+    await itemCriteria.deleteMany({ itemId: item._id });
     await items.deleteOne({ _id: item._id });
 
     return res.status(200).json({
@@ -682,117 +735,243 @@ app.delete('/api/items', async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       success: false,
-      error: err.toString()
+      error: 'Invalid item ID'
     });
   }
-})
+});
 
 //#endregion
 
-//#region == CRUD Operations for category criteria ==
+//#region == Search API ==
 
-// get existing category criteria
-app.get('/api/categories/criteria', async (req, res) => {
-  // ensure user is authenticated
+app.post('/api/search/items', async (req, res) => {
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
     return res;
   }
 
+  var { category, categoryId, criteria, generalSearch } = req.body;
+
+  // allow either "category" or "categoryId"
+  var finalCategoryId = categoryId || category;
+
+  if (!finalCategoryId) {
+    return res.status(400).json({
+      items: [],
+      error: 'Missing category ID'
+    });
+  }
+
+  if (!criteria) {
+    criteria = {};
+  }
+
+  if (typeof criteria !== 'object' || Array.isArray(criteria)) {
+    return res.status(400).json({
+      items: [],
+      error: 'criteria must be an object'
+    });
+  }
+
   try {
-  var criteriaId = req.query.criteriaId;
-  } catch (err) {
-    return req.status(400).json({
-      error: 'Missing required fields.'
-    })
-  }
+    // 1) validate category and ownership
+    var foundCategory = await categories.findOne({
+      _id: new mongodb.ObjectId(finalCategoryId)
+    });
 
-  // find specified criteria
-  try {
-    var criteria = await categoryCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(criteriaId)}, {projection: {userId: 0}});
-  }
-  catch (err) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid category criteria ID'
-    })
-  }
+    if (!foundCategory || !foundCategory.userId.equals(user._id)) {
+      return res.status(400).json({
+        items: [],
+        error: 'Category not found, or lacking permissions.'
+      });
+    }
 
-  // check if criteria is null & user has permission to edit it
-  if (!item) {
-    return res.status(400).json({
-      item: {},
-      error: 'category criteria not found, or lacking permissions.'
-    })
-  }
+    // 2) start with all item IDs in this category owned by this user
+    var categoryItems = await items.find({
+      userId: user._id,
+      categoryId: foundCategory._id
+    }).toArray();
 
-  return res.status(200).json({
-    item: item,
-    error: ''
-  })
-})
+    var allowedItemIds = categoryItems.map(item => item._id);
 
-// update category criteria
-app.patch('/api/categories/criteria', async (req, res) => {
-  // ensure user is authenticated
-  var [res, isAuthd, user] = await isUserAuthd(req, res);
-  if (!isAuthd) {
-    return res;
-  }
+    // if category has no items, stop early
+    if (allowedItemIds.length === 0) {
+      return res.status(200).json({
+        items: [],
+        error: ''
+      });
+    }
 
-  var { categoryId, criteriaName } = req.body;
+    // helper to compare ObjectIds using strings
+    function intersectObjectIdArrays(arr1, arr2) {
+      var set2 = new Set(arr2.map(x => x.toString()));
+      return arr1.filter(x => set2.has(x.toString()));
+    }
 
-  if (!criteriaId || !criteriaName) {
-    return res.status(400).json({
-      error: 'Missing required fields'
-    })
-  }
-
-  // get item
-  try {
-    var criteria = await categoryCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
-  }
-  catch (err) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid category criteria ID'
-    })
-  }
-
-  // check if category is null & user has permission to edit it
-  if (!criteria || !criteria.userId.equals(user._id)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Category criteria not found, or lacking permissions.'
-    })
-  }
-
-  // update category
-  try {
-    await categoryCriteria.updateOne(
-      { _id: criteria._id },
-      {
-        $set: {
-          criteriaName: criteriaName
-        }
+    // 3) apply each specific criteria filter as an AND filter
+    for (const [criteriaId, criteriaSearchValue] of Object.entries(criteria)) {
+      if (
+        criteriaSearchValue === null ||
+        criteriaSearchValue === undefined ||
+        criteriaSearchValue === ''
+      ) {
+        continue;
       }
-    );
+
+      var foundCategoryCriteria = await categoryCriteria.findOne({
+        _id: new mongodb.ObjectId(criteriaId)
+      });
+
+      if (!foundCategoryCriteria) {
+        return res.status(400).json({
+          items: [],
+          error: `Invalid category criteria ID: ${criteriaId}`
+        });
+      }
+
+      // make sure this criteria belongs to the chosen category
+      if (!foundCategoryCriteria.categoryId.equals(foundCategory._id)) {
+        return res.status(400).json({
+          items: [],
+          error: `Criteria ${criteriaId} does not belong to the selected category`
+        });
+      }
+
+      var regex = new RegExp(criteriaSearchValue, 'i');
+
+      var matchingItemCriteria = await itemCriteria.find({
+        categoryCriteriaId: foundCategoryCriteria._id,
+        criteriaValue: { $regex: regex },
+        itemId: { $in: allowedItemIds }
+      }).toArray();
+
+      var matchedItemIdsForThisCriteria = matchingItemCriteria.map(x => x.itemId);
+
+      allowedItemIds = intersectObjectIdArrays(allowedItemIds, matchedItemIdsForThisCriteria);
+
+      if (allowedItemIds.length === 0) {
+        return res.status(200).json({
+          items: [],
+          error: ''
+        });
+      }
+    }
+
+    // 4) apply generalSearch, if present
+    if (generalSearch && generalSearch.trim() !== '') {
+      var generalRegex = new RegExp(generalSearch, 'i');
+
+      // item name matches
+      var itemNameMatches = await items.find({
+        _id: { $in: allowedItemIds },
+        userId: user._id,
+        categoryId: foundCategory._id,
+        itemName: { $regex: generalRegex }
+      }).toArray();
+
+      var itemNameMatchIds = itemNameMatches.map(x => x._id);
+
+      // criteria value matches
+      var criteriaMatches = await itemCriteria.find({
+        itemId: { $in: allowedItemIds },
+        criteriaValue: { $regex: generalRegex }
+      }).toArray();
+
+      var criteriaMatchIds = criteriaMatches.map(x => x.itemId);
+
+      // union of generalSearch matches
+      var generalMatchIdMap = new Map();
+
+      for (var id of itemNameMatchIds) {
+        generalMatchIdMap.set(id.toString(), id);
+      }
+
+      for (var id of criteriaMatchIds) {
+        generalMatchIdMap.set(id.toString(), id);
+      }
+
+      var generalMatchedIds = Array.from(generalMatchIdMap.values());
+
+      allowedItemIds = intersectObjectIdArrays(allowedItemIds, generalMatchedIds);
+
+      if (allowedItemIds.length === 0) {
+        return res.status(200).json({
+          items: [],
+          error: ''
+        });
+      }
+    }
+
+    // 5) fetch final matching items
+    var finalItems = await items.find({
+      _id: { $in: allowedItemIds },
+      userId: user._id,
+      categoryId: foundCategory._id
+    }).toArray();
 
     return res.status(200).json({
-      success: true,
+      items: finalItems,
       error: ''
     });
+
   } catch (err) {
     return res.status(500).json({
-      success: false,
+      items: [],
       error: err.toString()
     });
   }
-})
+});
+
+//#endregion
+
+//#region == CRUD Operations for Category Criteria ==
+
+// get existing tags
+app.get('/api/categories/criteria', async (req, res) => {
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { categoryId } = req.query;
+
+  if (!categoryId) {
+    return res.status(400).json({
+      criteria: [],
+      error: 'Missing required fields.'
+    });
+  }
+
+  try {
+    var category = await categories.findOne({
+      _id: new mongodb.ObjectId(categoryId)
+    });
+
+    if (!category || !category.userId.equals(user._id)) {
+      return res.status(400).json({
+        criteria: [],
+        error: 'Category not found, or lacking permissions.'
+      });
+    }
+
+    var criteria = await categoryCriteria.find({
+      categoryId: category._id
+    }).toArray();
+
+    return res.status(200).json({
+      criteria: criteria,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(400).json({
+      criteria: [],
+      error: 'Invalid category ID'
+    });
+  }
+});
 
 // add category criteria
 app.post('/api/categories/criteria', async (req, res) => {
-// ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
     return res;
@@ -805,41 +984,44 @@ app.post('/api/categories/criteria', async (req, res) => {
       error: 'Missing required fields.'
     });
   }
-  
+
   try {
+    var category = await categories.findOne({
+      _id: new mongodb.ObjectId(categoryId)
+    });
+
+    if (!category || !category.userId.equals(user._id)) {
+      return res.status(400).json({
+        error: 'Category not found, or lacking permissions.'
+      });
+    }
+
     var newCriteria = {
       userId: user._id,
-      categoryId: new mongodb.ObjectId(categoryId),
+      categoryId: category._id,
       criteriaName: criteriaName
     };
-  } catch (err) {
-    return res.status(400).json({
-      criteriaName: "",
-      categoryId: "",
-      error: "Invalid category ID"
-    })
-  }
-  try {
+
     var result = await categoryCriteria.insertOne(newCriteria);
 
     return res.status(200).json({
       _id: result.insertedId.toString(),
-      categoryname: categoryName,
+      criteriaName: criteriaName,
       categoryId: categoryId,
       error: ''
     });
   } catch (err) {
-    return res.status(500).json({
+    return res.status(400).json({
       _id: '',
       criteriaName: '',
       categoryId: '',
-      error: err.toString()
+      error: 'Invalid category ID'
     });
   }
-})
+});
 
 // delete category criteria
-app.delete('api/categories/criteria', async (req, res) => {
+app.delete('/api/categories/criteria', async (req, res) => {
   // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) {
@@ -854,7 +1036,9 @@ app.delete('api/categories/criteria', async (req, res) => {
     })
   }
 
-  // get category
+  console.log("found criteria id")
+
+  // get criteria
   try {
     var criteria = await categoryCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
   }
@@ -874,6 +1058,7 @@ app.delete('api/categories/criteria', async (req, res) => {
   }
 
   try {
+    await itemCriteria.deleteMany({ categoryCriteriaId: criteria._id })
     await categoryCriteria.deleteOne({ _id: criteria._id });
 
     return res.status(200).json({
@@ -888,11 +1073,297 @@ app.delete('api/categories/criteria', async (req, res) => {
   }
 })
 
+app.patch('/api/categories/criteria', async (req, res) => {
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { criteriaId, criteriaName } = req.body;
+
+  if (!criteriaId || !criteriaName) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    });
+  }
+
+  try {
+    var criteria = await categoryCriteria.findOne({
+      _id: new mongodb.ObjectId(criteriaId)
+    });
+
+    if (!criteria || !criteria.userId.equals(user._id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Category criteria not found, or lacking permissions.'
+      });
+    }
+
+    await categoryCriteria.updateOne(
+      { _id: criteria._id },
+      {
+        $set: {
+          criteriaName: criteriaName
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category criteria ID'
+    });
+  }
+});
+
+//#endregion
+
+//#region == CRUD Operations for Item criteria
+
+// get item criteria
+app.get('/api/items/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  try {
+  var itemCriteriaId = req.query.itemCriteriaId;
+  } catch (err) {
+    return req.status(400).json({
+      error: 'Missing required fields.'
+    })
+  }
+
+  // find specified criteria
+  try {
+    var criteria = await itemCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(itemCriteriaId)}, {projection: {userId: 0}});
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid item criteria ID'
+    })
+  }
+
+  // check if criteria is null & user has permission to edit it
+  if (!criteria) {
+    return res.status(400).json({
+      criteria: {},
+      error: 'Item criteria not found, or lacking permissions.'
+    })
+  }
+
+  return res.status(200).json({
+    itemCriteria: criteria,
+    error: ''
+  })
+});
+
+// add new item criteria
+app.post('/api/items/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { itemId, criteriaId, value } = req.body;
+
+  if (!itemId || !criteriaId || !value) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    });
+  }
+  
+  // ensure item exists
+  try {
+    var item = await items.findOne({userId: user._id, _id: new mongodb.ObjectId(itemId)}, {projection: {userId: 0}});
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid item ID'
+    })
+  }
+
+  // ensure criteria exists
+  try {
+    var criteria = await categoryCriteria.findOne({userId: user._id, _id: new mongodb.ObjectId(criteriaId)}, {projection: {userId: 0}});
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid criteria ID'
+    })
+  }  
+
+  if (!item || !criteria) {
+    return res.status(400).json({
+      success: false,
+      error: 'Item or Criteria not found or missing permission'
+    })
+  }
+
+  // ensure item is in the same category as the criteria
+  if (item.categoryId.toString() != criteria.categoryId.toString()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Item does not match criteria category'
+    })
+  }
+
+  try {
+    var newItemCriteria = {
+    userId: user._id,
+    itemId: new mongodb.ObjectId(itemId),
+    categoryCriteriaId: new mongodb.ObjectId(criteriaId),
+    criteriaValue: value
+  };
+  } catch (err) {
+    return res.status(400).json({
+      itemCriteria: "",
+      itemId: "",
+      criteriaId: "",
+      error: "Invalid category ID"
+    })
+  }
+  try {
+    var result = await itemCriteria.insertOne(newItemCriteria);
+
+    return res.status(200).json({
+      _id: result.insertedId.toString(),
+      value: value,
+      itemId: itemId,
+      categoryCriteriaId: criteriaId,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.toString()
+    });
+  }
+});
+
+// delete item criteria
+app.delete('/api/items/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { criteriaId } = req.body;
+
+  if (!criteriaId) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get criteria
+  try {
+    var criteria = await itemCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category criteria ID'
+    })
+  }
+
+  // check if category is null & user has permission to remove it
+  if (!criteria || !criteria.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Item criteria not found, or lacking permissions'
+    })
+  }
+
+  try {
+    await itemCriteria.deleteOne({ _id: criteria._id });
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
+});
+
+// update item criteria
+app.patch('/api/items/criteria', async (req, res) => {
+  // ensure user is authenticated
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) {
+    return res;
+  }
+
+  var { criteriaId, value } = req.body;
+
+  if (!criteriaId || !value) {
+    return res.status(400).json({
+      error: 'Missing required fields'
+    })
+  }
+
+  // get item
+  try {
+    var criteria = await itemCriteria.findOne({ _id: new mongodb.ObjectId(criteriaId) }); 
+  }
+  catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid category criteria ID'
+    })
+  }
+
+  // check if category is null & user has permission to edit it
+  if (!criteria || !criteria.userId.equals(user._id)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Category criteria not found, or lacking permissions.'
+    })
+  }
+
+  // update category
+  try {
+    await itemCriteria.updateOne(
+      { _id: criteria._id },
+      {
+        $set: {
+          criteriaValue: value
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      error: ''
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.toString()
+    });
+  }
+});
+
+
 //#endregion
 
 //#region == User Operations ==
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/user/register', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -918,25 +1389,27 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    const sessionToken = makeSessionToken();
-    const sessionExpiration = makeSessionExpiration();
-
     const newUser = {
       email,
-      password,
-      sessionToken,
-      sessionExpiration,
+      password: hashPassword(password),
+      isVerified: false,
+      emailVerificationToken: null,
+      sessionToken: null,
+      sessionExpiration: null,
       passwordResetToken: null,
       passwordResetExpiration: null
     };
 
     const result = await users.insertOne(newUser);
 
+    const createdUser = await users.findOne({ _id: result.insertedId });
+    await sendVerificationEmail(createdUser);
+
     return res.status(200).json({
       id: result.insertedId.toString(),
       email,
-      sessionToken,
-      sessionExpiration,
+      sessionToken: '',
+      sessionExpiration: '',
       error: ''
     });
   } catch (err) {
@@ -950,7 +1423,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/user/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -964,7 +1437,9 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    const user = await users.findOne({ email: email, password: password });
+    const hashedPassword = hashPassword(password)
+
+    const user = await users.findOne({ email: email, password: hashedPassword });
 
     if (!user) {
       return res.status(401).json({
@@ -976,24 +1451,41 @@ app.post('/api/login', async (req, res) => {
       });
     }
 
-    const sessionToken = makeSessionToken();
-    const sessionExpiration = makeSessionExpiration();
+    if(!user.isVerified) {
+      return res.status(403).json({
+        id: '',
+        email: '',
+        sessionToken: '',
+        sessionExpiration: '',
+        error: 'Please verify your email before logging in'
+      });
+    }
 
-    await users.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          sessionToken: sessionToken,
-          sessionExpiration: sessionExpiration
+    let sessionToken = user.sessionToken;
+    let sessionExpiration = user.sessionExpiration;
+
+    const currentTime = new Date();
+
+    if (!sessionToken || !sessionExpiration || currentTime >= sessionExpiration) {
+      sessionToken = makeToken();
+      sessionExpiration = makeExpiration(7, 0);
+
+      await users.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            sessionToken: sessionToken,
+            sessionExpiration: sessionExpiration
+          }
         }
-      }
-    );
+      );
+    }
 
     return res.status(200).json({
       id: user._id.toString(),
       email: user.email,
-      sessionToken,
-      sessionExpiration,
+      sessionToken: sessionToken,
+      sessionExpiration: sessionExpiration,
       error: ''
     });
   } catch (err) {
@@ -1007,13 +1499,113 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.get('/api/user/verify-email', async(req, res) =>{
+  const { token } = req.query;
+
+  if(!token) {
+    return res.status(400).send('Missing verification token');
+  }
+
+  try {
+    const user = await users.findOne({ emailVerificationToken: token });
+    
+    if(!user) {
+      return res.status(400).send('Invalid verification token');
+    }
+
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set : {
+          isVerified: true,
+          emailVerificationToken: "",
+        }
+      }
+    );
+
+    return res.status(200).send('Email verified successfully. You can now log in.');
+  } catch (err) {
+    return res.status(500).send('Server error while verifying email');
+  }
+});
+
 // request password reset
-app.post('/api/user/reset', async (req, res) => {
+app.get('/api/user/request-password-reset', async (req, res) => {
+  var { email } = req.query;
+
+  // attempt to find user account with email
+  var user = await users.findOne( { email: email });
+
+  // if user found, send password reset
+  if (user && user.isVerified) {
+    // generate new password token & expiration
+    var passwordResetToken = makeToken()
+    var passwordResetExpiration = makeExpiration(0, 1)
+
+    // update user
+    await users.updateOne(
+      {_id: user._id},
+      {
+        $set : {
+          passwordResetToken: passwordResetToken,
+          passwordResetExpiration: passwordResetExpiration
+        }
+      }
+    )
+
+    var resetUrl = `${process.env.APP_BASE_URL}/api/user/reset-password?token=${passwordResetToken}`;
+
+    var content = '<p>Please use this link to reset your password: <a href="' + resetUrl + '">reset</a><br><i>The link will expire in 1 hour.</i></p>'
+
+    sendEmail(email, "Password Reset", content)
+  }
+  
+  return res.status(200).send("Password reset sent.")
 
 })
 
 // password reset
-app.put('/api/user/reset', async (req, res) => {
+app.put('/api/user/reset-password', async (req, res) => {
+  var { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({
+      error: 'Missing required data'
+    })
+  }
+
+  // find user with password reset token
+  var user = await users.findOne({passwordResetToken: token})
+
+  if (!user) {
+    return res.status(400).json({
+      error: 'Invalid password reset token'
+    })
+  }
+
+  var currentTime = new Date();
+  // ensure token is still valid, replace if not
+  if (currentTime >= user.passwordResetExpiration) {
+    return res.status(400).json({
+      error: 'Password reset token expired'
+    })
+  }
+
+  // update password
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        sessionToken: null,
+        sessionExpiration: null,
+        passwordResetToken: null,
+        passwordResetExpiration: null,
+        password: hashPassword(newPassword)
+      }
+    }
+  )
+
+  return res.status(200).json({error: ''})
 
 })
 
@@ -1024,6 +1616,7 @@ app.put('/api/user/reset', async (req, res) => {
 async function startServer() {
   await client.connect();
   db = client.db('collections_db');
+  
   users = db.collection('users');
   collections = db.collection('collections');
   categories = db.collection('categories');
