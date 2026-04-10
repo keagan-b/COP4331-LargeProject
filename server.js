@@ -388,7 +388,7 @@ app.post('/api/collections', async (req, res) => {
 
     var newCollection = {
       userId: user._id,
-      categoryId: category._id,
+      categoryId: new mongodb.ObjectId(category._id),
       collectionName: collectionName
     };
 
@@ -513,24 +513,22 @@ app.patch('/api/collections', async (req, res) => {
 
 // get existing collections
 app.get('/api/collections', async (req, res) => {
-  // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
-  if (!isAuthd) {
-    return res;
-  }
+  if (!isAuthd) return res;
+
+  var categoryId = req.query.categoryId;
 
   try {
-    var foundCollections = await collections.find({ userId: user._id }).toArray();
+    var query = { userId: user._id };
+    if (categoryId) {
+      query.categoryId = new mongodb.ObjectId(categoryId);
+    }
 
-    return res.status(200).json({
-      collections: foundCollections,
-      error: ''
-    });
+    var foundCollections = await collections.find(query, { projection: { userId: 0 } }).toArray();
+
+    return res.status(200).json({ collections: foundCollections, error: '' });
   } catch (err) {
-    return res.status(500).json({
-      collections: [],
-      error: err.toString()
-    });
+    return res.status(500).json({ collections: [], error: err.toString() });
   }
 });
 
@@ -581,121 +579,71 @@ app.get('/api/items', async (req, res) => {
 
 // update items
 app.patch('/api/items', async (req, res) => {
-  // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
-  if (!isAuthd) {
-    return res;
-  }
+  if (!isAuthd) return res;
 
-  var { itemId, itemName, categoryId } = req.body;
+  var { itemId, itemName, categoryId, criteriaValues } = req.body;
 
-  if (!itemId || (!itemName && !categoryId)) {
-    return res.status(400).json({
-      error: 'Missing required fields'
-    })
+  if (!itemId || (!itemName && !categoryId && !criteriaValues)) {
+    return res.status(400).json({ error: 'Missing required fields' });
   }
 
   let toUpdate = {};
-
-  if (itemName) {toUpdate["itemName"] = itemName}
+  if (itemName) toUpdate.itemName = itemName;
   if (categoryId) {
-    try {
-    toUpdate["categoryId"] = new mongodb.ObjectId(categoryId)
-    } catch (err) {
-      return res.status(400).json({
-        success: false, 
-        error: "Invalid category ID"
-      });
+    try { toUpdate.categoryId = new mongodb.ObjectId(categoryId); }
+    catch { return res.status(400).json({ error: 'Invalid category ID' }); }
+  }
+  if (criteriaValues) toUpdate.criteriaValues = criteriaValues;
+
+  try {
+    var item = await items.findOne({ _id: new mongodb.ObjectId(itemId) });
+    if (!item || !item.userId.equals(user._id)) {
+      return res.status(400).json({ error: 'Item not found, or lacking permissions.' });
     }
-  }
 
-  // get item
-  try {
-    var item = await items.findOne({ _id: new mongodb.ObjectId(itemId) }); 
-  }
-  catch (err) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid item ID'
-    })
-  }
+    await items.updateOne({ _id: item._id }, { $set: toUpdate });
 
-  // check if category is null & user has permission to edit it
-  if (!item || !item.userId.equals(user._id)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Item not found, or lacking permissions.'
-    })
-  }
-
-  // update category
-  try {
-    await items.updateOne(
-      { _id: item._id },
-      {
-        $set: toUpdate
-      }
-    );
-
-    return res.status(200).json({
-      success: true,
-      error: ''
-    });
+    return res.status(200).json({ success: true, error: '' });
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: err.toString()
-    });
+    return res.status(500).json({ success: false, error: err.toString() });
   }
-})
+});
 
 // add items
 app.post('/api/items', async (req, res) => {
-  // ensure user is authenticated
   var [res, isAuthd, user] = await isUserAuthd(req, res);
-  if (!isAuthd) {
-    return res;
-  }
+  if (!isAuthd) return res;
 
-  var { itemName, categoryId } = req.body;
+  var { itemName, categoryId, collectionId, criteriaValues } = req.body;
 
   if (!itemName || !categoryId) {
-    return res.status(400).json({
-      error: 'Missing required fields.'
-    });
+    return res.status(400).json({ error: 'Missing required fields.' });
   }
-  
+
   try {
     var newItem = {
       userId: user._id,
       categoryId: new mongodb.ObjectId(categoryId),
-      itemName: itemName
+      collectionId: collectionId ? new mongodb.ObjectId(collectionId) : null,
+      itemName: itemName,
+      criteriaValues: criteriaValues || {}
     };
-  } catch (err) {
-    return res.status(400).json({
-      itemName: "",
-      categoryId: "",
-      error: "Invalid category ID"
-    })
-  }
-  try {
+
     var result = await items.insertOne(newItem);
 
     return res.status(200).json({
       _id: result.insertedId.toString(),
       itemName: itemName,
       categoryId: categoryId,
+      collectionId: collectionId || null,
+      criteriaValues: criteriaValues || {},
       error: ''
     });
   } catch (err) {
-    return res.status(500).json({
-      _id: '',
-      itemName: '',
-      categoryId: '',
-      error: err.toString()
-    });
+    return res.status(500).json({ _id: '', itemName: '', error: err.toString() });
   }
-})
+});
 
 // remove items
 app.delete('/api/items', async (req, res) => {
@@ -1553,7 +1501,7 @@ app.get('/api/user/request-password-reset', async (req, res) => {
       }
     )
 
-    var resetUrl = `${process.env.APP_BASE_URL}/api/user/reset-password?token=${passwordResetToken}`;
+    var resetUrl = `${process.env.APP_BASE_URL}/resetpassword?token=${passwordResetToken}`;
 
     var content = '<p>Please use this link to reset your password: <a href="' + resetUrl + '">reset</a><br><i>The link will expire in 1 hour.</i></p>'
 
