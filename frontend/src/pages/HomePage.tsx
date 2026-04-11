@@ -95,12 +95,72 @@ const HomePage: React.FC = () => {
     navigate("/login");
   };
 
+  const handleEditCategory = async (
+  categoryId: string,
+  name: string,
+  criteria: string[]
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const res = await fetch("/api/categories", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", token: token || "" },
+      body: JSON.stringify({ categoryId, categoryName: name }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { success: false, error: data.error };
+    // Update criteria — fetch existing then sync
+    const existing = await fetch(`/api/categories/criteria?categoryId=${categoryId}`, { headers: { token: token || "" } });
+    const existingData = await existing.json();
+    const existingCriteria: { _id: string; criteriaName: string }[] = existingData.criteria || [];
+    // Delete removed criteria
+    for (const ec of existingCriteria) {
+      if (!criteria.includes(ec.criteriaName)) {
+        await fetch("/api/categories/criteria", { method: "DELETE", headers: { "Content-Type": "application/json", token: token || "" }, body: JSON.stringify({ criteriaId: ec._id }) });
+      }
+    }
+    // Add new criteria
+    for (const c of criteria) {
+      if (!existingCriteria.find((ec) => ec.criteriaName === c)) {
+        await fetch("/api/categories/criteria", { method: "POST", headers: { "Content-Type": "application/json", token: token || "" }, body: JSON.stringify({ criteriaName: c, categoryId }) });
+      }
+    }
+    setCategories((prev) => prev.map((cat) => cat._id === categoryId ? { ...cat, categoryName: name } : cat));
+    return { success: true };
+  } catch { return { success: false, error: "Unable to connect to server." }; }
+};
+
+const handleDeleteCategory = async (categoryId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const res = await fetch("/api/categories", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", token: token || "" },
+      body: JSON.stringify({ categoryId }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { success: false, error: data.error };
+    setCategories((prev) => prev.filter((cat) => cat._id !== categoryId));
+    return { success: true };
+  } catch { return { success: false, error: "Unable to connect to server." }; }
+};
+
+const getCategoryCriteria = async (categoryId: string): Promise<string[]> => {
+  try {
+    const res = await fetch(`/api/categories/criteria?categoryId=${categoryId}`, { headers: { token: token || "" } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.criteria || []).map((c: { criteriaName: string }) => c.criteriaName);
+  } catch { return []; }
+};
+
   return (
     <Home
       categories={categories}
       onCategorySelect={handleCategorySelect}
       onAddCategory={handleAddCategory}
       onLogout={handleLogout}
+      onEditCategory={handleEditCategory}
+      onDeleteCategory={handleDeleteCategory}
+      getCategoryCriteria={getCategoryCriteria}
     />
   );
 };

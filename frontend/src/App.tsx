@@ -15,7 +15,6 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/resetpassword" element={<ResetPasswordPage />} />
-
         <Route path="/collection/:collectionId" element={<CollectionPage />} />
       </Routes>
     </BrowserRouter>
