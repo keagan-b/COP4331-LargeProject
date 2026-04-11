@@ -1,3 +1,4 @@
+import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
@@ -6,7 +7,7 @@ import CategoryPage from "./pages/CategoryPage";
 import CollectionPage from "./pages/CollectionPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 
-const PrivateRoute = ({ element }: { element: JSX.Element }) => {
+const PrivateRoute = ({ element }: { element: React.ReactElement }) => {
   const token = localStorage.getItem("token");
   return token ? element : <Navigate to="/login" replace />;
 };
