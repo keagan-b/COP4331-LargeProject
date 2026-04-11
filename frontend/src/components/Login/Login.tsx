@@ -32,7 +32,7 @@ console.log("Login response:", data);
       setMessage("Login successful!");
 
       setTimeout(() => {
-        navigate("/");
+        navigate("/home");
       }, 1000);
     } catch (err) {
       setMessage("Unable to connect to the server. Please try again later.");
