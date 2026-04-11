@@ -39,7 +39,6 @@ interface CategoryProps {
 const Category: React.FC<CategoryProps> = ({
     activeCollectionId,
     categoryName,
-    categoryId,
     collections,
     criteria,
     items,
