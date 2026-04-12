@@ -42,7 +42,7 @@ const ResetPassword: React.FC = () => {
       const data = await res.json();
       if (res.ok) {
         setMessage("Password reset successfully! Redirecting to login...");
-        setTimeout(() => { window.location.href = "/login"; }, 1500);
+        setTimeout(() => { window.location.href = "/"; }, 1500);
       } else {
         setMessage(data.error || "Failed to reset password.");
       }
