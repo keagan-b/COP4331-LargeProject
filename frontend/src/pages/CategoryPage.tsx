@@ -40,7 +40,7 @@ const CategoryPage: React.FC = () => {
   const category = (location.state as LocationState)?.category;
 
   useEffect(() => {
-    if (!category) { navigate("/"); return; }
+    if (!category) { navigate("/home"); return; }
 
     const headers = { token: token || "" };
 
@@ -48,7 +48,7 @@ const CategoryPage: React.FC = () => {
       // Fetch collections
       try {
         const res = await fetch(`/api/collections?categoryId=${categoryId}`, { headers });
-        if (res.status === 403 || res.status === 401) { navigate("/login"); return; }
+        if (res.status === 403 || res.status === 401) { navigate("/"); return; }
         const data = await res.json();
         setCollections(data.collections || []);
       } catch (err) {
@@ -227,8 +227,8 @@ const CategoryPage: React.FC = () => {
     }
   };
 
-  const handleNavigateHome = () => navigate("/");
-  const handleLogout = () => { localStorage.removeItem("token"); navigate("/login"); };
+  const handleNavigateHome = () => navigate("/home");
+  const handleLogout = () => { localStorage.removeItem("token"); navigate("/"); };
 
   if (!category) return null;
 
