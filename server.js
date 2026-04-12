@@ -2,7 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const mongodb = require('mongodb');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+
+const { EmailClient } = require("@azure/communication-email");
 
 const app = express();
 app.use(cors());
@@ -12,6 +13,8 @@ require('dotenv').config()
 
 const url = process.env.MONGODB_URL
 const client = new mongodb.MongoClient(url);
+
+const emailClient = new EmailClient(process.env.AZURE_COMM_STRING);
 
 let db;
 let users;
@@ -85,30 +88,28 @@ async function getUserFromToken(token) {
 
 async function sendEmail(to, subject, content) {
   try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+    const message = {
+      senderAddress: process.env.AZURE_EMAIL_FROM,
+      content: {
+        subject: subject,
+        html: content
       },
-      tls: {
-        ciphers: "TLSv1.2"
+      recipients: {
+        to: Array.isArray(to)
+          ? to.map(address => ({ address }))
+          : [{ address: to }]
       }
-    });
+    };
 
-    await transporter.sendMail({
-      from: process.env.SMTP_NO_REPLY,
-      to: to,
-      subject: subject,
-      html: content
+    const poller = await emailClient.beginSend(message);
+    const result = await poller.pollUntilDone();
 
-    })
+    if (result.status !== "Succeeded") {
+      throw new Error(`Email failed: ${result.status}`);
+    }
 
-  }
-  catch (error) {
-    console.error("Error sending email:", error)
+  } catch (error) {
+    console.error("Error sending email:", error);
   }
 }
 
@@ -125,7 +126,7 @@ async function sendVerificationEmail(user){
        }
     );
 
-  var cerifyUrl = `${process.env.APP_BASE_URL}/api/user/verify-email?token=${emailVerificationToken}`;
+  var cerifyUrl = `http://group7.sedsucf.org/api/user/verify-email?token=${emailVerificationToken}`;
 
   var content = "Welcome to Collector’s Pair-A-Dice! Please verify your email with this link: " + cerifyUrl
 
@@ -1501,7 +1502,7 @@ app.get('/api/user/request-password-reset', async (req, res) => {
       }
     )
 
-    var resetUrl = `${process.env.APP_BASE_URL}/resetpassword?token=${passwordResetToken}`;
+    var resetUrl = `http://group7.sedsucf.org/api/resetpassword?token=${passwordResetToken}`;
 
     var content = '<p>Please use this link to reset your password: <a href="' + resetUrl + '">reset</a><br><i>The link will expire in 1 hour.</i></p>'
 
