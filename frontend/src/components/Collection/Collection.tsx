@@ -232,7 +232,7 @@ const Collection: React.FC<CollectionProps> = ({
                                             setOpenMenuId(openMenuId === col._id ? null : col._id);
                                         }}
                                     >
-                                        ⋯
+                                        ⋮
                                     </button>
                                     {openMenuId === col._id && (
                                         <div className="col-menu-popover">
