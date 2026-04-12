@@ -19,7 +19,7 @@ const HomePage: React.FC = () => {
           headers: { token: token || "" },
         });
         if (res.status === 403 || res.status === 401) {
-          navigate("/login");
+          navigate("/");
           return;
         }
         const data = await res.json();
@@ -92,7 +92,7 @@ const HomePage: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
-    navigate("/login");
+    navigate("/");
   };
 
   const handleEditCategory = async (
