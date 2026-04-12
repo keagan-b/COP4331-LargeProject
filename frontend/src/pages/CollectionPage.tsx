@@ -21,20 +21,15 @@ interface Item {
 }
 
 interface LocationState {
-  collection: {
-    _id: string;
-    collectionName: string;
-  };
-  category: {
-    _id: string;
-    categoryName: string;
-  };
+  collection: { _id: string; collectionName: string; };
+  category: { _id: string; categoryName: string; };
   siblingCollections: SiblingCollection[];
 }
 
 const CollectionPage: React.FC = () => {
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [siblingCollections, setSiblingCollections] = useState<SiblingCollection[]>([]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,15 +39,17 @@ const CollectionPage: React.FC = () => {
   const state = location.state as LocationState;
   const collection = state?.collection;
   const category = state?.category;
-  const siblingCollections = state?.siblingCollections || [];
 
   useEffect(() => {
     if (!collection || !category) { navigate("/"); return; }
 
+    // Sync sibling collections from location state
+    setSiblingCollections(state?.siblingCollections || []);
+
     const headers = { token: token || "" };
 
     const fetchCriteriaAndItems = async () => {
-      // Step 1: fetch criteria using the correct endpoint
+      // Fetch criteria
       try {
         const res = await fetch(`/api/categories/criteria?categoryId=${category._id}`, { headers });
         if (res.ok) {
@@ -63,15 +60,13 @@ const CollectionPage: React.FC = () => {
         console.error("Failed to fetch criteria:", err);
       }
 
-      // Step 2: fetch items for this category then filter by collectionId
-      // Items store collectionId as a field so we filter client-side
+      // Fetch all items for this category then filter by collectionId
       try {
         const res = await fetch(`/api/categories/items?categoryId=${category._id}`, { headers });
         if (!res.ok) return;
         const data = await res.json();
         const allItems: Item[] = data.items || [];
-        // Only show items belonging to this specific collection
-        setItems(allItems.filter((item) => item.collectionId === collectionId));
+        setItems(allItems.filter((item) => item.collectionId?.toString() === collectionId));
       } catch (err) {
         console.error("Failed to fetch items:", err);
       }
@@ -86,12 +81,47 @@ const CollectionPage: React.FC = () => {
     });
   };
 
+  const handleEditCollection = async (collectionId: string, newName: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/collections", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", token: token || "" },
+        body: JSON.stringify({ collectionId, collectionName: newName }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || "Failed to update." };
+      setSiblingCollections((prev) => prev.map((c) => c._id === collectionId ? { ...c, collectionName: newName } : c));
+      return { success: true };
+    } catch {
+      return { success: false, error: "Unable to connect to server." };
+    }
+  };
+
+  const handleDeleteCollection = async (collectionId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/collections", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", token: token || "" },
+        body: JSON.stringify({ collectionId }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || "Failed to delete." };
+      setSiblingCollections((prev) => prev.filter((c) => c._id !== collectionId));
+      // If we deleted the current collection, navigate back to category
+      if (collectionId === collection._id) {
+        navigate(`/category/${category._id}`, { state: { category } });
+      }
+      return { success: true };
+    } catch {
+      return { success: false, error: "Unable to connect to server." };
+    }
+  };
+
   const handleAddItem = async (
     itemName: string,
     criteriaValues: Record<string, string>
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Post to /api/items with collectionId and criteriaValues embedded
       const res = await fetch("/api/items", {
         method: "POST",
         headers: { "Content-Type": "application/json", token: token || "" },
@@ -104,16 +134,51 @@ const CollectionPage: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || "Failed to add item." };
-
-      const newItem: Item = {
+      setItems((prev) => [...prev, {
         _id: data._id,
         itemName: data.itemName,
         categoryId: category._id,
         collectionId,
         criteriaValues,
-      };
+      }]);
+      return { success: true };
+    } catch {
+      return { success: false, error: "Unable to connect to server." };
+    }
+  };
 
-      setItems((prev) => [...prev, newItem]);
+  const handleEditItem = async (
+    itemId: string,
+    itemName: string,
+    criteriaValues: Record<string, string>
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", token: token || "" },
+        body: JSON.stringify({ itemId, itemName, criteriaValues }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || "Failed to update item." };
+      setItems((prev) => prev.map((item) =>
+        item._id === itemId ? { ...item, itemName, criteriaValues } : item
+      ));
+      return { success: true };
+    } catch {
+      return { success: false, error: "Unable to connect to server." };
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/items", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", token: token || "" },
+        body: JSON.stringify({ itemId }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || "Failed to delete item." };
+      setItems((prev) => prev.filter((item) => item._id !== itemId));
       return { success: true };
     } catch {
       return { success: false, error: "Unable to connect to server." };
@@ -121,14 +186,8 @@ const CollectionPage: React.FC = () => {
   };
 
   const handleNavigateHome = () => navigate("/");
-
-  const handleNavigateCategory = () =>
-    navigate(`/category/${category._id}`, { state: { category } });
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/login");
-  };
+  const handleNavigateCategory = () => navigate(`/category/${category._id}`, { state: { category } });
+  const handleLogout = () => { localStorage.removeItem("token"); navigate("/login"); };
 
   if (!collection || !category) return null;
 
@@ -140,7 +199,11 @@ const CollectionPage: React.FC = () => {
       criteria={criteria}
       items={items}
       onSiblingSelect={handleSiblingSelect}
+      onEditCollection={handleEditCollection}
+      onDeleteCollection={handleDeleteCollection}
       onAddItem={handleAddItem}
+      onEditItem={handleEditItem}
+      onDeleteItem={handleDeleteItem}
       onNavigateHome={handleNavigateHome}
       onNavigateCategory={handleNavigateCategory}
       onLogout={handleLogout}

@@ -167,29 +167,20 @@ const CategoryPage: React.FC = () => {
       const res = await fetch("/api/items", {
         method: "POST",
         headers: { "Content-Type": "application/json", token: token || "" },
-        body: JSON.stringify({ itemName, categoryId }),
+        body: JSON.stringify({
+          itemName,
+          categoryId: category._id,
+          
+          criteriaValues,
+        }),
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || "Failed to add item." };
-
-      const newItemId = data._id;
-
-      // Save each criteria value
-      for (const criterion of criteria) {
-        const value = criteriaValues[criterion.criteriaName];
-        if (value && value.trim()) {
-          await fetch("/api/items/criteria", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", token: token || "" },
-            body: JSON.stringify({ itemId: newItemId, criteriaId: criterion._id, value: value.trim() }),
-          });
-        }
-      }
-
       setItems((prev) => [...prev, {
-        _id: newItemId,
+        _id: data._id,
         itemName: data.itemName,
-        categoryId: categoryId || "",
+        categoryId: category._id,
+        
         criteriaValues,
       }]);
       return { success: true };
@@ -199,66 +190,26 @@ const CategoryPage: React.FC = () => {
   };
 
   const handleEditItem = async (
-  itemId: string,
-  itemName: string,
-  criteriaValues: Record<string, string>
-): Promise<{ success: boolean; error?: string }> => {
-  try {
-    // Step 1: Update item name
-    const res = await fetch("/api/items", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", token: token || "" },
-      body: JSON.stringify({ itemId, itemName }),
-    });
-    const data = await res.json();
-    console.log("PATCH item response:", data);
-    if (!res.ok) return { success: false, error: data.error || "Failed to update item." };
-
-    // Step 2: fetch existing criteria values
-    const cvRes = await fetch(`/api/items/criteria?itemId=${itemId}`, {
-      headers: { token: token || "" },
-    });
-    const cvData = await cvRes.json();
-    console.log("Existing criteria values:", cvData);
-
-    const existing = cvData.itemCriteria || [];
-
-    for (const criterion of criteria) {
-      const value = criteriaValues[criterion.criteriaName]?.trim() || "";
-      const existingEntry = existing.find(
-        (e: any) => e.categoryCriteriaId.toString() === criterion._id.toString()
-      );
-      console.log(`Criterion: ${criterion.criteriaName}, existing:`, existingEntry, "value:", value);
-
-      if (existingEntry) {
-        const patchRes = await fetch("/api/items/criteria", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json", token: token || "" },
-          body: JSON.stringify({ criteriaId: existingEntry._id, value }),
-        });
-        const patchData = await patchRes.json();
-        console.log("PATCH criteria response:", patchData);
-      } else if (value) {
-        const postRes = await fetch("/api/items/criteria", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", token: token || "" },
-          body: JSON.stringify({ itemId, criteriaId: criterion._id, value }),
-        });
-        const postData = await postRes.json();
-        console.log("POST criteria response:", postData);
-      }
+    itemId: string,
+    itemName: string,
+    criteriaValues: Record<string, string>
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", token: token || "" },
+        body: JSON.stringify({ itemId, itemName, criteriaValues }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || "Failed to update item." };
+      setItems((prev) => prev.map((item) =>
+        item._id === itemId ? { ...item, itemName, criteriaValues } : item
+      ));
+      return { success: true };
+    } catch {
+      return { success: false, error: "Unable to connect to server." };
     }
-
-    setItems((prev) => prev.map((item) =>
-      item._id === itemId ? { ...item, itemName, criteriaValues } : item
-    ));
-
-    return { success: true };
-  } catch (err) {
-    console.error("Edit item error:", err);
-    return { success: false, error: "Unable to connect to server." };
-  }
-};
+  };
 
   const handleDeleteItem = async (itemId: string): Promise<{ success: boolean; error?: string }> => {
     try {
