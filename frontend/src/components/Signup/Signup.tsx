@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import "./Signup.css";
 import { Link } from "react-router-dom";
 
@@ -8,9 +8,27 @@ const Signup: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [resendMessage, setResendMessage] = useState("");
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCooldown = () => {
+    setCooldown(3);
+    cooldownRef.current = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (cooldown > 0) return;
 
     if (password !== confirmPassword) {
       setMessage("Passwords do not match");
@@ -21,9 +39,7 @@ const Signup: React.FC = () => {
     try {
       const res = await fetch("/api/user/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
@@ -32,16 +48,39 @@ const Signup: React.FC = () => {
       if (!res.ok) {
         setMessage(data.error || "Something went wrong. Please try again.");
         setIsSuccess(false);
+        startCooldown();
         return;
       }
 
       setIsSuccess(true);
-      setMessage(
-        `Account created! A verification email has been sent to ${email}.`
-      );
+      setMessage(`Account created! A verification email has been sent to ${email}.`);
+      startCooldown();
     } catch (err) {
       setMessage("Unable to connect to the server. Please try again later.");
       setIsSuccess(false);
+      startCooldown();
+    }
+  };
+
+  const handleResend = async () => {
+    if (cooldown > 0) return;
+
+    try {
+      const res = await fetch("/api/user/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      startCooldown();
+
+      if (res.status === 409 || res.ok) {
+        setResendMessage("Email resent! Check your inbox.");
+      } else {
+        setResendMessage("Failed to resend. Please try again.");
+      }
+    } catch {
+      setResendMessage("Unable to connect to the server.");
     }
   };
 
@@ -61,7 +100,6 @@ const Signup: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-
             <label>Password</label>
             <input
               type="password"
@@ -69,7 +107,6 @@ const Signup: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-
             <label>Confirm Password</label>
             <input
               type="password"
@@ -77,15 +114,30 @@ const Signup: React.FC = () => {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
-
-            <button type="submit">Create Account</button>
-
+            <button type="submit" disabled={cooldown > 0}>Create Account</button>
             {message && <p className="message error">{message}</p>}
           </form>
         ) : (
           <div className="verification-notice">
             <p className="message success">{message}</p>
-            <p>Once verified, you can proceed to log in.</p>
+            <p>
+              Didn't get an email?{" "}
+              {cooldown > 0 ? (
+                <span style={{ color: "gray" }}>Send Again</span>
+              ) : (
+                <span
+                  onClick={handleResend}
+                  style={{ color: "#007acc", cursor: "pointer", textDecoration: "underline" }}
+                >
+                  Send Again
+                </span>
+              )}
+            </p>
+            {resendMessage && (
+              <p className="message success" style={{ marginTop: "8px" }}>
+                {resendMessage}
+              </p>
+            )}
           </div>
         )}
 
