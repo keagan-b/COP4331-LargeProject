@@ -37,7 +37,7 @@ const Signup: React.FC = () => {
 
       setIsSuccess(true);
       setMessage(
-        `Account created! A verification email has been sent to ${email}. Please check your inbox and verify your account before logging in.`
+        `Account created! A verification email has been sent to ${email}.`
       );
     } catch (err) {
       setMessage("Unable to connect to the server. Please try again later.");
@@ -90,7 +90,7 @@ const Signup: React.FC = () => {
         )}
 
         <p className="switch-text">
-          Already have an account? <Link to="/login">Log In</Link>
+          Already have an account? <Link to="/">Log In</Link>
         </p>
       </div>
     </div>
