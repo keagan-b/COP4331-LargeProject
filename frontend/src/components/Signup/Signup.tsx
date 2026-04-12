@@ -54,6 +54,7 @@ const Signup: React.FC = () => {
 
       setIsSuccess(true);
       setMessage(`Account created! A verification email has been sent to ${email}.`);
+      setResendMessage("");
       startCooldown();
     } catch (err) {
       setMessage("Unable to connect to the server. Please try again later.");
@@ -91,36 +92,38 @@ const Signup: React.FC = () => {
       <div className="auth-box">
         <h2>Sign Up</h2>
 
-        {!isSuccess ? (
-          <form onSubmit={handleSignup}>
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <label>Confirm Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-            <button type="submit" disabled={cooldown > 0}>Create Account</button>
-            {message && <p className="message error">{message}</p>}
-          </form>
-        ) : (
-          <div className="verification-notice">
-            <p className="message success">{message}</p>
-            <p>
+        <form onSubmit={handleSignup}>
+          <label>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <label>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <label>Confirm Password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+          <button type="submit" disabled={cooldown > 0}>Create Account</button>
+
+          {message && (
+            <p className={`message ${isSuccess ? "success" : "error"}`}>
+              {message}
+            </p>
+          )}
+
+          {isSuccess && (
+            <p style={{ fontSize: "0.85rem", marginTop: "4px" }}>
               Didn't get an email?{" "}
               {cooldown > 0 ? (
                 <span style={{ color: "gray" }}>Send Again</span>
@@ -133,13 +136,14 @@ const Signup: React.FC = () => {
                 </span>
               )}
             </p>
-            {resendMessage && (
-              <p className="message success" style={{ marginTop: "8px" }}>
-                {resendMessage}
-              </p>
-            )}
-          </div>
-        )}
+          )}
+
+          {resendMessage && (
+            <p className="message success" style={{ marginTop: "4px" }}>
+              {resendMessage}
+            </p>
+          )}
+        </form>
 
         <p className="switch-text">
           Already have an account? <Link to="/">Log In</Link>
