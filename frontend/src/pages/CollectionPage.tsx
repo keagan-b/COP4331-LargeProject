@@ -41,7 +41,7 @@ const CollectionPage: React.FC = () => {
   const category = state?.category;
 
   useEffect(() => {
-    if (!collection || !category) { navigate("/"); return; }
+    if (!collection || !category) { navigate("/home"); return; }
 
     // Sync sibling collections from location state
     setSiblingCollections(state?.siblingCollections || []);
@@ -185,9 +185,9 @@ const CollectionPage: React.FC = () => {
     }
   };
 
-  const handleNavigateHome = () => navigate("/");
+  const handleNavigateHome = () => navigate("/home");
   const handleNavigateCategory = () => navigate(`/category/${category._id}`, { state: { category } });
-  const handleLogout = () => { localStorage.removeItem("token"); navigate("/login"); };
+  const handleLogout = () => { localStorage.removeItem("token"); navigate("/"); };
 
   if (!collection || !category) return null;
 
