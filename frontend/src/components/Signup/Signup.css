@@ -108,3 +108,11 @@ html, body {
   font-size: 0.9rem;
   color: #ff4d4d;
 }
+
+.message.success {
+  color: white;
+}
+
+.message.error {
+  color: red;
+}
