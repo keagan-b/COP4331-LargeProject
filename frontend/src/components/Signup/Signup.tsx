@@ -25,43 +25,51 @@ const Signup: React.FC = () => {
     }, 1000);
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
+const [isSending, setIsSending] = useState(false);
 
-    if (cooldown > 0) return;
+const handleSignup = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (password !== confirmPassword) {
-      setMessage("Passwords do not match");
+  if (cooldown > 0) return;
+
+  if (password !== confirmPassword) {
+    setMessage("Passwords do not match");
+    setIsSuccess(false);
+    return;
+  }
+
+  setIsSending(true);
+  setMessage("");
+
+  try {
+    const res = await fetch("/api/user/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setMessage(data.error || "Something went wrong. Please try again.");
       setIsSuccess(false);
+      startCooldown();
+      setIsSending(false);
       return;
     }
 
-    try {
-      const res = await fetch("/api/user/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage(data.error || "Something went wrong. Please try again.");
-        setIsSuccess(false);
-        startCooldown();
-        return;
-      }
-
-      setIsSuccess(true);
-      setMessage(`Account created! A verification email has been sent to ${email}.`);
-      setResendMessage("");
-      startCooldown();
-    } catch (err) {
-      setMessage("Unable to connect to the server. Please try again later.");
-      setIsSuccess(false);
-      startCooldown();
-    }
-  };
+    setIsSuccess(true);
+    setMessage(`Account created! A verification email has been sent to ${email}. `);
+    setResendMessage("");
+    startCooldown();
+    setIsSending(false);
+  } catch (err) {
+    setMessage("Unable to connect to the server. Please try again later.");
+    setIsSuccess(false);
+    startCooldown();
+    setIsSending(false);
+  }
+};
 
   const handleResend = async () => {
     if (cooldown > 0) return;
@@ -86,10 +94,11 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div className="auth-container">
-      <h1 className="title">Collector's Pair-A-Dice</h1>
+    <div className="signup-container">
+      <img src="/projectlogo.png" alt="Logo" className="login-logo" />
+      <h1 className="title">Collector's Pair-A-Dice Co.</h1>
 
-      <div className="auth-box">
+      <div className="signup-box">
         <h2>Sign Up</h2>
 
         <form onSubmit={handleSignup}>
@@ -116,27 +125,36 @@ const Signup: React.FC = () => {
           />
           <button type="submit" disabled={cooldown > 0}>Create Account</button>
 
-          {message && (
-            <p className={`message ${isSuccess ? "success" : "error"}`}>
-              {message}
-            </p>
-          )}
+          {isSending && (
+  <p className="message success">Sending email...</p>
+)}
 
-          {isSuccess && (
-            <p style={{ fontSize: "0.85rem", marginTop: "4px" }}>
-              Didn't get an email?{" "}
-              {cooldown > 0 ? (
-                <span style={{ color: "gray" }}>Send Again</span>
-              ) : (
-                <span
-                  onClick={handleResend}
-                  style={{ color: "#007acc", cursor: "pointer", textDecoration: "underline" }}
-                >
-                  Send Again
-                </span>
-              )}
-            </p>
-          )}
+{!isSending && message && (
+  <p className={`message ${isSuccess ? "success" : "error"}`}>
+    {message}
+    {isSuccess && (
+      <span style={{ fontSize: "0.85rem", marginTop: "4px" }}>
+        Didn't get an email?{" "}
+        {cooldown > 0 ? (
+          <span style={{ color: "gray" }}>Send Again</span>
+        ) : (
+          <span
+            onClick={handleResend}
+            style={{ color: "#007acc", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Send Again
+          </span>
+        )}
+      </span>
+    )}
+  </p>
+)}
+
+{!isSending && resendMessage && (
+  <p className="message success" style={{ marginTop: "4px" }}>
+    {resendMessage}
+  </p>
+)}
 
           {resendMessage && (
             <p className="message success" style={{ marginTop: "4px" }}>
@@ -144,7 +162,7 @@ const Signup: React.FC = () => {
             </p>
           )}
         </form>
-
+        <br></br>
         <p className="switch-text">
           Already have an account? <Link to="/">Log In</Link>
         </p>
