@@ -142,6 +142,7 @@ const Collection: React.FC<CollectionProps> = ({
 
     const handleCloseItemModal = () => { setSelectedItem(null); setIsEditing(false); setShowDeleteItemConfirm(false); setItemViewError(""); };
 
+    // Save Item
     const handleSaveItem = async () => {
         if (!selectedItem) return;
         const name = editItemName.trim();
