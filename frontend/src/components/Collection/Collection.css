@@ -428,11 +428,12 @@
 }
 
 .modal-label {
-    font-size: 0.78rem;
+    font-size: 0.90rem;
     font-weight: 600;
     color: white;
     text-transform: uppercase;
     letter-spacing: 0.06em;
+    text-decoration: underline;
 }
 
 .modal-box input {
@@ -532,11 +533,6 @@
     text-align: center;
 }
 
-/* === ITEM VIEW MODAL === */
-.item-view-box {
-    width: 480px;
-}
-
 .item-view-name {
     font-size: 1.5rem;
     font-weight: 600;
@@ -612,4 +608,130 @@
 .col-menu-option-delete:hover {
     background: #e74c3c;
     color: white;
+}
+/* === ITEM IMAGE === */
+.item-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.item-card-no-image {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font-size: 0.8rem;
+}
+
+.item-card-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* === ITEM VIEW MODAL LAYOUT === */
+.item-view-box {
+  width: 550px;
+  max-width: 95vw;
+}
+
+.item-add-box {
+  width: 550px;
+  max-width: 95vw;
+}
+
+.item-view-layout,
+.item-add-layout {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  min-height: 300px;
+}
+
+.item-view-image-panel {
+  flex-shrink: 0;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.item-view-img {
+  width: 220px;
+  height: 280px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #007acc;
+}
+
+.item-view-img-placeholder {
+  width: 220px;
+  height: 280px;
+  border-radius: 8px;
+  border: 2px dashed #007acc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font-size: 0.85rem;
+}
+
+.image-upload-btn {
+  background: #007acc;
+  color: white;
+  border: none;
+  border-radius: 7px;
+  padding: 7px 14px;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.image-upload-btn:hover { background: #008acc; }
+.image-upload-btn:disabled { background: #444; cursor: not-allowed; }
+
+.item-view-fields-panel {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+  max-height: 340px;
+}
+
+.item-view-fields-panel::-webkit-scrollbar { width: 4px; }
+.item-view-fields-panel::-webkit-scrollbar-track { background: transparent; }
+.item-view-fields-panel::-webkit-scrollbar-thumb { background: #007acc; border-radius: 4px; }
+
+.item-view-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+}
+
+.item-view-value {
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.95rem;
+  color: white;
+  padding: 4px 0;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
 }
