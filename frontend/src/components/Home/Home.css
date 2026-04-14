@@ -12,7 +12,6 @@ body {
     font-family: 'Exo 2', sans-serif;
 }
 
-/* === LAYOUT === */
 .home-wrapper {
     display: flex;
     flex-direction: column;
