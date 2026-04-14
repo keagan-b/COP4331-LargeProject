@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const baseUrl = "http://10.0.2.2:5000"; // server runs on port 5000
+  static const baseUrl = "http://group7.sedsucf.org";
 
   // Stores the session token after a successful login
   static String? sessionToken;
