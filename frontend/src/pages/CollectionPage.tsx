@@ -41,6 +41,10 @@ const CollectionPage: React.FC = () => {
   const category = state?.category;
 
   useEffect(() => {
+  document.title = `${collection.collectionName} | Collector's Pair-A-Dice`;
+}, [collection]);
+
+  useEffect(() => {
     if (!collection || !category) { navigate("/home"); return; }
 
     // Sync sibling collections from location state
@@ -49,7 +53,7 @@ const CollectionPage: React.FC = () => {
     const headers = { token: token || "" };
 
     const fetchCriteriaAndItems = async () => {
-      // Fetch criteria
+      // ////criteria
       try {
         const res = await fetch(`/api/categories/criteria?categoryId=${category._id}`, { headers });
         if (res.ok) {
@@ -81,6 +85,22 @@ const CollectionPage: React.FC = () => {
     });
   };
 
+  const handleUploadImage = async (file: File): Promise<{ url: string; error?: string }> => {
+  try {
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await fetch("/api/upload-image", {
+      method: "POST",
+      headers: { token: token || "" },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) return { url: "", error: data.error };
+    return { url: data.url };
+  } catch {
+    return { url: "", error: "Upload failed." };
+  }
+};
   const handleEditCollection = async (collectionId: string, newName: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch("/api/collections", {
@@ -117,57 +137,61 @@ const CollectionPage: React.FC = () => {
     }
   };
 
-  const handleAddItem = async (
-    itemName: string,
-    criteriaValues: Record<string, string>
-  ): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const res = await fetch("/api/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", token: token || "" },
-        body: JSON.stringify({
-          itemName,
-          categoryId: category._id,
-          collectionId,
-          criteriaValues,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) return { success: false, error: data.error || "Failed to add item." };
-      setItems((prev) => [...prev, {
-        _id: data._id,
-        itemName: data.itemName,
+const handleAddItem = async (
+  itemName: string,
+  criteriaValues: Record<string, string>,
+  imageUrl?: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const res = await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: token || "" },
+      body: JSON.stringify({
+        itemName,
         categoryId: category._id,
         collectionId,
         criteriaValues,
-      }]);
-      return { success: true };
-    } catch {
-      return { success: false, error: "Unable to connect to server." };
-    }
-  };
+        imageUrl: imageUrl || null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { success: false, error: data.error || "Failed to add item." };
+    setItems((prev) => [...prev, {
+      _id: data._id,
+      itemName: data.itemName,
+      categoryId: category._id,
+      collectionId,
+      criteriaValues,
+      imageUrl: imageUrl || null,
+    }]);
+    return { success: true };
+  } catch {
+    return { success: false, error: "Unable to connect to server." };
+  }
+};
 
-  const handleEditItem = async (
-    itemId: string,
-    itemName: string,
-    criteriaValues: Record<string, string>
-  ): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const res = await fetch("/api/items", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", token: token || "" },
-        body: JSON.stringify({ itemId, itemName, criteriaValues }),
-      });
-      const data = await res.json();
-      if (!res.ok) return { success: false, error: data.error || "Failed to update item." };
-      setItems((prev) => prev.map((item) =>
-        item._id === itemId ? { ...item, itemName, criteriaValues } : item
-      ));
-      return { success: true };
-    } catch {
-      return { success: false, error: "Unable to connect to server." };
-    }
-  };
+const handleEditItem = async (
+  itemId: string,
+  itemName: string,
+  criteriaValues: Record<string, string>,
+  imageUrl?: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const res = await fetch("/api/items", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", token: token || "" },
+      body: JSON.stringify({ itemId, itemName, criteriaValues, imageUrl: imageUrl || null }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { success: false, error: data.error || "Failed to update item." };
+    setItems((prev) => prev.map((item) =>
+      item._id === itemId ? { ...item, itemName, criteriaValues, imageUrl: imageUrl || null } : item
+    ));
+    return { success: true };
+  } catch {
+    return { success: false, error: "Unable to connect to server." };
+  }
+};
 
   const handleDeleteItem = async (itemId: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -187,7 +211,7 @@ const CollectionPage: React.FC = () => {
 
   const handleNavigateHome = () => navigate("/home");
   const handleNavigateCategory = () => navigate(`/category/${category._id}`, { state: { category } });
-  const handleLogout = () => { localStorage.removeItem("token"); navigate("/"); };
+  const handleLogout = () => { localStorage.removeItem("token"); navigate("/login"); };
 
   if (!collection || !category) return null;
 
@@ -207,6 +231,7 @@ const CollectionPage: React.FC = () => {
       onNavigateHome={handleNavigateHome}
       onNavigateCategory={handleNavigateCategory}
       onLogout={handleLogout}
+      onUploadImage={handleUploadImage}
     />
   );
 };
