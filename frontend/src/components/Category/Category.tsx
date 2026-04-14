@@ -22,7 +22,6 @@ interface Item {
 interface CategoryProps {
     activeCollectionId?: string | null;
     categoryName: string;
-    categoryId: string;
     collections: Collection[];
     criteria: Criteria[];
     items: Item[];
@@ -41,7 +40,6 @@ interface CategoryProps {
 const Category: React.FC<CategoryProps> = ({
     activeCollectionId,
     categoryName,
-    categoryId,
     collections,
     criteria,
     items,
