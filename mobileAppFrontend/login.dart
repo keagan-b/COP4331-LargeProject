@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'sign_up_page.dart';
 import 'forgot_password_page.dart';
 import 'categories.dart';
-import 'cameratest.dart';
 import 'services/api_service.dart';
 
 void main() {
@@ -110,27 +109,10 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _handleDemo() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const CategoriesPage()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF2A2A2A),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CameraTestPage()),
-          );
-        },
-        backgroundColor: const Color(0xFF1A7FD4),
-        child: const Icon(Icons.camera_alt, color: Colors.white),
-      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -389,32 +371,6 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                             ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Demo Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: _handleDemo,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF9800),
-                            foregroundColor: Colors.white,
-                            shape: const StadiumBorder(),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Demo',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'Impact',
-                              letterSpacing: 0.5,
-                            ),
                           ),
                         ),
                       ),

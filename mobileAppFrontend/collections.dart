@@ -1,9 +1,404 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'login.dart';
 import 'categories.dart';
+import 'items.dart';
+import 'services/api_service.dart';
 
-class CollectionsPage extends StatelessWidget {
-  const CollectionsPage({super.key});
+class CollectionModel {
+  final String id;
+  final String name;
+  CollectionModel({required this.id, required this.name});
+  factory CollectionModel.fromJson(Map<String, dynamic> j) =>
+      CollectionModel(id: j['_id'], name: j['collectionName']);
+}
+
+class CollectionsPage extends StatefulWidget {
+  final Category category;
+  const CollectionsPage({super.key, required this.category});
+
+  @override
+  State<CollectionsPage> createState() => _CollectionsPageState();
+}
+
+class _CollectionsPageState extends State<CollectionsPage> {
+  List<CollectionModel> _collections = [];
+  List<ItemModel> _items = [];
+  List<CriterionModel> _criteria = [];
+  bool _loading = true;
+
+  // Search
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _searchField = 'Item Name';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAll();
+  }
+
+  // ── API ────────────────────────────────────────────────────────────────────
+
+  Future<void> _fetchAll() async {
+    await Future.wait([_fetchCollections(), _fetchCriteria()]);
+    await _fetchItems();
+    setState(() => _loading = false);
+  }
+
+  Future<void> _fetchCollections() async {
+    try {
+      final res = await http.get(
+        Uri.parse(
+            '${ApiService.baseUrl}/api/collections?categoryId=${widget.category.id}'),
+        headers: {'token': ApiService.sessionToken ?? ''},
+      );
+      final data = jsonDecode(res.body);
+      _collections = (data['collections'] as List)
+          .map((e) => CollectionModel.fromJson(e))
+          .toList();
+    } catch (_) {}
+  }
+
+  Future<void> _fetchCriteria() async {
+    try {
+      final res = await http.get(
+        Uri.parse(
+            '${ApiService.baseUrl}/api/categories/criteria?categoryId=${widget.category.id}'),
+        headers: {'token': ApiService.sessionToken ?? ''},
+      );
+      final data = jsonDecode(res.body);
+      _criteria = (data['criteria'] as List)
+          .map((e) => CriterionModel.fromJson(e))
+          .toList();
+    } catch (_) {}
+  }
+
+  Future<void> _fetchItems() async {
+    try {
+      final res = await http.get(
+        Uri.parse(
+            '${ApiService.baseUrl}/api/categories/items?categoryId=${widget.category.id}'),
+        headers: {'token': ApiService.sessionToken ?? ''},
+      );
+      final data = jsonDecode(res.body);
+      final raw = (data['items'] as List).cast<Map<String, dynamic>>();
+
+      // Hydrate criteria values for each item
+      final hydrated = await Future.wait(raw.map((item) async {
+        try {
+          final cvRes = await http.get(
+            Uri.parse(
+                '${ApiService.baseUrl}/api/items/criteria/all?itemId=${item['_id']}'),
+            headers: {'token': ApiService.sessionToken ?? ''},
+          );
+          final cvData = jsonDecode(cvRes.body);
+          final Map<String, String> values = {};
+          for (final cv in (cvData['itemCriteria'] ?? [])) {
+            final match = _criteria.firstWhere(
+              (c) => c.id == cv['categoryCriteriaId'].toString(),
+              orElse: () => CriterionModel(id: '', name: ''),
+            );
+            if (match.name.isNotEmpty) {
+              values[match.name] = cv['criteriaValue'];
+            }
+          }
+          return ItemModel.fromJson(item, values);
+        } catch (_) {
+          return ItemModel.fromJson(item, {});
+        }
+      }));
+
+      _items = hydrated;
+    } catch (_) {}
+  }
+
+  Future<void> _addCollection(String name) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiService.baseUrl}/api/collections'),
+        headers: {
+          'Content-Type': 'application/json',
+          'token': ApiService.sessionToken ?? '',
+        },
+        body: jsonEncode(
+            {'collectionName': name, 'categoryId': widget.category.id}),
+      );
+      final data = jsonDecode(res.body);
+      setState(() {
+        _collections
+            .add(CollectionModel(id: data['id'], name: data['collectionName']));
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _editCollection(String collectionId, String newName) async {
+    try {
+      await http.patch(
+        Uri.parse('${ApiService.baseUrl}/api/collections'),
+        headers: {
+          'Content-Type': 'application/json',
+          'token': ApiService.sessionToken ?? '',
+        },
+        body: jsonEncode(
+            {'collectionId': collectionId, 'collectionName': newName}),
+      );
+      setState(() {
+        _collections = _collections
+            .map((c) => c.id == collectionId
+                ? CollectionModel(id: collectionId, name: newName)
+                : c)
+            .toList();
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _deleteCollection(String collectionId) async {
+    try {
+      await http.delete(
+        Uri.parse('${ApiService.baseUrl}/api/collections'),
+        headers: {
+          'Content-Type': 'application/json',
+          'token': ApiService.sessionToken ?? '',
+        },
+        body: jsonEncode({'collectionId': collectionId}),
+      );
+      setState(() =>
+          _collections.removeWhere((c) => c.id == collectionId));
+    } catch (_) {}
+  }
+
+  void _logout() {
+    ApiService.sessionToken = null;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (_) => false,
+    );
+  }
+
+  // ── Search ─────────────────────────────────────────────────────────────────
+
+  List<ItemModel> get _filteredItems {
+    if (_searchQuery.isEmpty) return _items;
+    final q = _searchQuery.toLowerCase();
+    return _items.where((item) {
+      if (_searchField == 'Item Name') {
+        return item.name.toLowerCase().contains(q);
+      }
+      final val = item.criteriaValues[_searchField] ?? '';
+      return val.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // ── Dialogs ────────────────────────────────────────────────────────────────
+
+  void _showAddCollectionDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('New Collection',
+            style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Impact',
+                fontWeight: FontWeight.w900)),
+        content: _dialogTextField(ctrl, 'Collection name'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style:
+                    TextStyle(color: Colors.white70, fontFamily: 'Impact')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              Navigator.pop(ctx);
+              _addCollection(name);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF007ACC),
+              foregroundColor: Colors.white,
+              shape: const StadiumBorder(),
+              elevation: 0,
+            ),
+            child: const Text('Create',
+                style: TextStyle(
+                    fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCollectionOptions(CollectionModel col) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF2A2A2A),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(col.name,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Impact',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.edit, color: Color(0xFF007ACC)),
+              title: const Text('Edit',
+                  style:
+                      TextStyle(color: Colors.white, fontFamily: 'Impact')),
+              onTap: () {
+                Navigator.pop(context);
+                _showEditCollectionDialog(col);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.redAccent),
+              title: const Text('Delete',
+                  style:
+                      TextStyle(color: Colors.white, fontFamily: 'Impact')),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteCollectionDialog(col);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditCollectionDialog(CollectionModel col) {
+    final ctrl = TextEditingController(text: col.name);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Edit Collection',
+            style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Impact',
+                fontWeight: FontWeight.w900)),
+        content: _dialogTextField(ctrl, 'Collection name'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style:
+                    TextStyle(color: Colors.white70, fontFamily: 'Impact')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              Navigator.pop(ctx);
+              _editCollection(col.id, name);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF007ACC),
+              foregroundColor: Colors.white,
+              shape: const StadiumBorder(),
+              elevation: 0,
+            ),
+            child: const Text('Save',
+                style: TextStyle(
+                    fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteCollectionDialog(CollectionModel col) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Collection',
+            style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Impact',
+                fontWeight: FontWeight.w900)),
+        content: Text(
+          'Are you sure you want to delete "${col.name}"? This cannot be undone.',
+          style:
+              const TextStyle(color: Colors.white70, fontFamily: 'Impact'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style:
+                    TextStyle(color: Colors.white70, fontFamily: 'Impact')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _deleteCollection(col.id);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: const StadiumBorder(),
+              elevation: 0,
+            ),
+            child: const Text('Delete',
+                style: TextStyle(
+                    fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dialogTextField(TextEditingController ctrl, String hint) {
+    return TextField(
+      controller: ctrl,
+      style: const TextStyle(color: Colors.black, fontSize: 15),
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: Color(0xFF0A5FAA), width: 2),
+        ),
+      ),
+    );
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -12,161 +407,363 @@ class CollectionsPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Top buttons
+            // Top bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Themes Button
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF007ACC),
-                      foregroundColor: Colors.white,
-                      shape: const StadiumBorder(),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 36,
-                        vertical: 18,
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      "Themes",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: 'Impact',
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                  Image.asset(
+                    'assets/CPAD_Logo.png',
+                    height: 96,
+                    fit: BoxFit.contain,
                   ),
-
-                  // Log Out Button
                   ElevatedButton(
-                    onPressed: () => Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginPage()),
-                      (route) => false,
-                    ),
+                    onPressed: _logout,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF007ACC),
                       foregroundColor: Colors.white,
                       shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 36,
-                        vertical: 18,
-                      ),
+                          horizontal: 28, vertical: 14),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      "Log Out",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: 'Impact',
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    child: const Text('Log Out',
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Impact')),
                   ),
                 ],
               ),
             ),
 
-            // Divider line
-            Container(
-              height: 4,
-              width: double.infinity,
-              color: const Color(0xFF007ACC),
+            // Blue divider
+            Container(height: 4, color: const Color(0xFF007ACC)),
+
+            const SizedBox(height: 12),
+
+            // Breadcrumb
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const CategoriesPage()),
+                        (_) => false,
+                      ),
+                      child: const Text('Home',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'Impact',
+                              decoration: TextDecoration.underline,
+                              decorationColor: Colors.white)),
+                    ),
+                    const Text(' > ',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Impact')),
+                    Text(widget.category.name,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Impact')),
+                  ],
+                ),
+              ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
-            // Home Text
+            // Collections horizontal scroll row
+            if (!_loading)
+              SizedBox(
+                height: 52,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  children: [
+                    // Add collection button
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: OutlinedButton(
+                        onPressed: _showAddCollectionDialog,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: const Color(0xFF252526),
+                          side: const BorderSide(
+                              color: Color(0xFF007ACC), width: 2),
+                          shape: const CircleBorder(),
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(48, 48),
+                        ),
+                        child: const Text('+',
+                            style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF007ACC))),
+                      ),
+                    ),
+                    // Collection chips
+                    ..._collections.map((col) => Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: GestureDetector(
+                            onLongPress: () => _showCollectionOptions(col),
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ItemsPage(
+                                    category: widget.category,
+                                    collection: col,
+                                    allCollections: _collections,
+                                    criteria: _criteria,
+                                  ),
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF007ACC),
+                                foregroundColor: Colors.white,
+                                shape: const StadiumBorder(),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 10),
+                                elevation: 0,
+                              ),
+                              child: Text(col.name,
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      fontFamily: 'Impact')),
+                            ),
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 12),
+
+            // Search bar with dropdown
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      onTap: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const CategoriesPage()),
-                      ),
-                      child: const Text(
-                        'Home',
-                        style: TextStyle(
+                  // Dropdown
+                  Container(
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3A3A3A),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF007ACC), width: 1.5),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _searchField,
+                        dropdownColor: const Color(0xFF3A3A3A),
+                        style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
                           fontFamily: 'Impact',
-                          letterSpacing: 0.5,
-                          decoration: TextDecoration.underline,
-                          decorationColor: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
                         ),
+                        iconEnabledColor: const Color(0xFF007ACC),
+                        items: [
+                          'Item Name',
+                          ..._criteria.map((c) => c.name),
+                        ].map((field) => DropdownMenuItem(
+                              value: field,
+                              child: Text(field),
+                            )).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _searchField = val;
+                              _searchQuery = '';
+                              _searchController.clear();
+                            });
+                          }
+                        },
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    '>',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: 'Impact',
+                  const SizedBox(width: 10),
+                  // Text field
+                  Expanded(
+                    child: SizedBox(
+                      height: 46,
+                      child: TextField(
+                        controller: _searchController,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Impact',
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search by $_searchField…',
+                          hintStyle: const TextStyle(
+                            color: Colors.white38,
+                            fontFamily: 'Impact',
+                            fontSize: 14,
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFF3A3A3A),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF007ACC), width: 1.5),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF007ACC), width: 1.5),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF007ACC), width: 2),
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear,
+                                      color: Colors.white54, size: 18),
+                                  onPressed: () => setState(() {
+                                    _searchQuery = '';
+                                    _searchController.clear();
+                                  }),
+                                )
+                              : const Icon(Icons.search,
+                                  color: Colors.white38, size: 18),
+                        ),
+                        onChanged: (val) =>
+                            setState(() => _searchQuery = val.trim()),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
 
-            // Add Button
-            Padding(
-              padding: const EdgeInsets.only(left: 20, top: 16, bottom: 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: const Color(0xFF252526),
-                      side: const BorderSide(
-                        color: Color(0xFF007ACC),
-                        width: 3,
-                      ),
-                      shape: const CircleBorder(),
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Text(
-                      '+',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF007ACC),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            const SizedBox(height: 12),
 
-            // Placeholder content
-            const Expanded(
-              child: Center(
-                child: Text(
-                  "Categories Content",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    fontFamily: 'Impact',
-                  ),
-                ),
-              ),
+            // Items grid (all items in this category)
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: Color(0xFF007ACC)))
+                  : _filteredItems.isEmpty
+                      ? Center(
+                          child: Text(
+                              _items.isEmpty
+                                  ? 'No items yet.'
+                                  : 'No items match your search.',
+                              style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontFamily: 'Impact',
+                                  fontSize: 16)))
+                      : GridView.builder(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.72,
+                          ),
+                          itemCount: _filteredItems.length,
+                          itemBuilder: (_, i) {
+                            final item = _filteredItems[i];
+                            return GestureDetector(
+                              onTap: () async {
+                                final col = _collections.firstWhere(
+                                  (c) => c.id == item.collectionId,
+                                  orElse: () => _collections.isNotEmpty
+                                      ? _collections.first
+                                      : CollectionModel(id: '', name: ''),
+                                );
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ItemEditPage(
+                                      item: item,
+                                      criteria: _criteria,
+                                      category: widget.category,
+                                      collection: col,
+                                    ),
+                                  ),
+                                );
+                                // Refresh after editing
+                                setState(() => _loading = true);
+                                await _fetchItems();
+                                setState(() => _loading = false);
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2A2A2A),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: const Color(0xFF007ACC),
+                                      width: 2),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: item.imageUrl != null
+                                          ? ClipRRect(
+                                              borderRadius:
+                                                  const BorderRadius.vertical(
+                                                      top: Radius.circular(6)),
+                                              child: Image.network(
+                                                item.imageUrl!,
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                                errorBuilder: (_, __, ___) =>
+                                                    const Icon(Icons.image,
+                                                        color: Color(0xFF007ACC),
+                                                        size: 48),
+                                              ),
+                                            )
+                                          : const Center(
+                                              child: Icon(Icons.image,
+                                                  color: Color(0xFF007ACC),
+                                                  size: 48)),
+                                    ),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(6),
+                                      child: Text(
+                                        item.name,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontFamily: 'Impact',
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 13,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
