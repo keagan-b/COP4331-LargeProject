@@ -7,6 +7,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,14 +26,16 @@ console.log("Login response:", data);
 
       if (!res.ok) {
         setMessage(data.error || "Something went wrong. Please try again.");
+        setIsSuccess(false);
         return;
       }
 
-      localStorage.setItem("token", data.sessionToken);
-      setMessage("Login successful!");
+    localStorage.setItem("token", data.sessionToken);
+    setMessage("Login successful!");
+    setIsSuccess(true);
 
       setTimeout(() => {
-        navigate("/home");
+        navigate("/");
       }, 1000);
     } catch (err) {
       setMessage("Unable to connect to the server. Please try again later.");
@@ -41,6 +44,7 @@ console.log("Login response:", data);
 
   return (
     <div className="login-container">
+      <img src="/projectlogo.png" alt="Logo" className="login-logo" />
       <h1 className="title">Collector's Pair-A-Dice</h1>
 
       <div className="login-box">
@@ -70,7 +74,11 @@ console.log("Login response:", data);
           <button type="submit">Log In</button>
         </form>
 
-        {message && <p className="message">{message}</p>}
+        {message && (
+  <p className={`login-message ${isSuccess ? "success" : "error"}`}>
+    {message}
+  </p>
+)}
 
         <p className="signup-text">
           Don't have an account? <Link to="/signup">Sign Up</Link>
