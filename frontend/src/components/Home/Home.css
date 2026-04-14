@@ -432,3 +432,15 @@ body {
 }
 
 .remove-tag:hover { color: #e74c3c; }
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+}
