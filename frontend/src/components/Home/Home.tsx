@@ -77,7 +77,7 @@ const Home: React.FC<HomeProps> = ({
     setAddModalError("");
     setShowAddModal(true);
   };
-
+// Add Criteria
   const handleAddCriterion = () => {
     const val = newCriterion.trim();
     if (!val) return;
