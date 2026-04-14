@@ -97,7 +97,7 @@ const CategoryPage: React.FC = () => {
       state: { collection, category, siblingCollections: collections },
     });
   };
-
+  
   const handleAddCollection = async (name: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch("/api/collections", {
