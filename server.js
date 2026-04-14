@@ -11,6 +11,17 @@ app.use(express.json());
 
 require('dotenv').config()
 
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 const url = process.env.MONGODB_URL
 const client = new mongodb.MongoClient(url);
 
@@ -583,9 +594,9 @@ app.patch('/api/items', async (req, res) => {
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) return res;
 
-  var { itemId, itemName, categoryId, criteriaValues } = req.body;
+  var { itemId, itemName, categoryId, criteriaValues, imageUrl } = req.body;
 
-  if (!itemId || (!itemName && !categoryId && !criteriaValues)) {
+  if (!itemId || (!itemName && !categoryId && !criteriaValues && !imageUrl)) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -596,6 +607,7 @@ app.patch('/api/items', async (req, res) => {
     catch { return res.status(400).json({ error: 'Invalid category ID' }); }
   }
   if (criteriaValues) toUpdate.criteriaValues = criteriaValues;
+  if (imageUrl !== undefined) toUpdate.imageUrl = imageUrl;
 
   try {
     var item = await items.findOne({ _id: new mongodb.ObjectId(itemId) });
@@ -616,7 +628,7 @@ app.post('/api/items', async (req, res) => {
   var [res, isAuthd, user] = await isUserAuthd(req, res);
   if (!isAuthd) return res;
 
-  var { itemName, categoryId, collectionId, criteriaValues } = req.body;
+  var { itemName, categoryId, collectionId, criteriaValues, imageUrl } = req.body;
 
   if (!itemName || !categoryId) {
     return res.status(400).json({ error: 'Missing required fields.' });
@@ -628,7 +640,8 @@ app.post('/api/items', async (req, res) => {
       categoryId: new mongodb.ObjectId(categoryId),
       collectionId: collectionId ? new mongodb.ObjectId(collectionId) : null,
       itemName: itemName,
-      criteriaValues: criteriaValues || {}
+      criteriaValues: criteriaValues || {},
+      imageUrl: imageUrl || null
     };
 
     var result = await items.insertOne(newItem);
@@ -639,6 +652,7 @@ app.post('/api/items', async (req, res) => {
       categoryId: categoryId,
       collectionId: collectionId || null,
       criteriaValues: criteriaValues || {},
+      imageUrl: imageUrl || null,
       error: ''
     });
   } catch (err) {
@@ -1559,6 +1573,28 @@ app.put('/api/user/reset-password', async (req, res) => {
 })
 
 //#endregion
+
+app.post('/api/upload-image', upload.single('image'), async (req, res) => {
+  var [res, isAuthd, user] = await isUserAuthd(req, res);
+  if (!isAuthd) return res;
+
+  if (!req.file) {
+    return res.status(400).json({ url: '', error: 'No image file provided' });
+  }
+
+  try {
+    const b64 = Buffer.from(req.file.buffer).toString('base64');
+    const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+
+    const result = await cloudinary.uploader.upload(dataURI, {
+      folder: 'user-uploads',
+    });
+
+    return res.status(200).json({ url: result.secure_url, error: '' });
+  } catch (err) {
+    return res.status(500).json({ url: '', error: err.toString() });
+  }
+});
 
 //#region == Server Start Command & Function ==
 
