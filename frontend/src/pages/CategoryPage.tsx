@@ -17,6 +17,7 @@ interface Item {
   itemName: string;
   categoryId: string;
   criteriaValues?: Record<string, string>;
+  imageUrl?: string;
 }
 
 interface LocationState {
@@ -40,8 +41,10 @@ const CategoryPage: React.FC = () => {
   const category = (location.state as LocationState)?.category;
 
   useEffect(() => {
-  document.title = `${category.categoryName} | Collector's Pair-A-Dice`;
-}, [category]);
+    if (category) {
+      document.title = `${category.categoryName} | Collector's Pair-A-Dice`;
+    }
+  }, [category]);
 
   useEffect(() => {
     if (!category) { navigate("/home"); return; }
@@ -54,57 +57,32 @@ const CategoryPage: React.FC = () => {
         const res = await fetch(`/api/collections?categoryId=${categoryId}`, { headers });
         if (res.status === 403 || res.status === 401) { navigate("/login"); return; }
         const data = await res.json();
-        setCollections((data.collections || []).sort((a, b) => 
-        a.collectionName.localeCompare(b.collectionName)
+        setCollections((data.collections || []).sort((a: Collection, b: Collection) =>
+          a.collectionName.localeCompare(b.collectionName)
         ));
-        
       } catch (err) {
         console.error("Failed to fetch collections:", err);
       }
 
-      // Fetch criteria first
-      let loadedCriteria: Criterion[] = [];
+      // Fetch criteria
       try {
         const res = await fetch(`/api/categories/criteria?categoryId=${categoryId}`, { headers });
         if (res.ok) {
           const data = await res.json();
-          loadedCriteria = data.criteria || [];
-          setCriteria(loadedCriteria);
+          setCriteria(data.criteria || []);
         }
       } catch (err) {
         console.error("Failed to fetch criteria:", err);
       }
 
-      // Fetch items then hydrate with criteria values
+      // Fetch items — criteriaValues already embedded on each document
       try {
         const res = await fetch(`/api/categories/items?categoryId=${categoryId}`, { headers });
         if (!res.ok) return;
         const data = await res.json();
-        const fetchedItems: Item[] = data.items || [];
-
-        const itemsWithCriteria = await Promise.all(
-          fetchedItems.map(async (item) => {
-            try {
-              const cvRes = await fetch(`/api/items/criteria?itemId=${item._id}`, { headers });
-              if (!cvRes.ok) return item;
-              const cvData = await cvRes.json();
-              const criteriaValues: Record<string, string> = {};
-              for (const cv of cvData.itemCriteria || []) {
-                const match = loadedCriteria.find(
-                  (c) => c._id === cv.categoryCriteriaId.toString()
-                );
-                if (match) criteriaValues[match.criteriaName] = cv.criteriaValue;
-              }
-              return { ...item, criteriaValues };
-            } catch {
-              return item;
-            }
-          })
-        );
-
-        setItems((data.items || []).sort((a, b) => 
-        a.itemName.localeCompare(b.itemName)
-));
+        setItems((data.items || []).sort((a: Item, b: Item) =>
+          a.itemName.localeCompare(b.itemName)
+        ));
       } catch (err) {
         console.error("Failed to fetch items:", err);
       }
@@ -130,8 +108,8 @@ const CategoryPage: React.FC = () => {
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || "Failed to add collection." };
       setCollections((prev) => [...prev, { _id: data.id, collectionName: data.collectionName }]
-      .sort((a, b) => a.collectionName.localeCompare(b.collectionName))
-);
+        .sort((a: Collection, b: Collection) => a.collectionName.localeCompare(b.collectionName))
+      );
       return { success: true };
     } catch {
       return { success: false, error: "Unable to connect to server." };
@@ -148,8 +126,8 @@ const CategoryPage: React.FC = () => {
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || "Failed to update." };
       setCollections((prev) => prev.map((c) => c._id === collectionId ? { ...c, collectionName: newName } : c)
-    .sort((a, b) => a.collectionName.localeCompare(b.collectionName))
-);
+        .sort((a: Collection, b: Collection) => a.collectionName.localeCompare(b.collectionName))
+      );
       return { success: true };
     } catch {
       return { success: false, error: "Unable to connect to server." };
@@ -189,19 +167,19 @@ const CategoryPage: React.FC = () => {
         }),
       });
       const data = await res.json();
-if (!res.ok) return { success: false, error: data.error || "Failed to add item." };
+      if (!res.ok) return { success: false, error: data.error || "Failed to add item." };
 
-const newItem = {
-  _id: data._id,
-  itemName: data.itemName,
-  categoryId: category._id,
-  criteriaValues,
-  imageUrl: imageUrl || null,
-};
+      const newItem: Item = {
+        _id: data._id,
+        itemName: data.itemName,
+        categoryId: category._id,
+        criteriaValues,
+        imageUrl: imageUrl || undefined,
+      };
 
-setItems((prev) => [...prev, newItem]
-  .sort((a, b) => a.itemName.localeCompare(b.itemName))
-);
+      setItems((prev) => [...prev, newItem]
+        .sort((a: Item, b: Item) => a.itemName.localeCompare(b.itemName))
+      );
       return { success: true };
     } catch {
       return { success: false, error: "Unable to connect to server." };
@@ -222,9 +200,9 @@ setItems((prev) => [...prev, newItem]
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || "Failed to update item." };
-      setItems((prev) => prev.map((item) => item._id === itemId ? { ...item, itemName, criteriaValues, imageUrl } : item)
-        .sort((a, b) => a.itemName.localeCompare(b.itemName))
-      );
+      setItems((prev) => prev.map((item) =>
+        item._id === itemId ? { ...item, itemName, criteriaValues, imageUrl } : item
+      ).sort((a: Item, b: Item) => a.itemName.localeCompare(b.itemName)));
       return { success: true };
     } catch {
       return { success: false, error: "Unable to connect to server." };
@@ -232,21 +210,21 @@ setItems((prev) => [...prev, newItem]
   };
 
   const handleUploadImage = async (file: File): Promise<{ url: string; error?: string }> => {
-  try {
-    const formData = new FormData();
-    formData.append("image", file);
-    const res = await fetch("/api/upload-image", {
-      method: "POST",
-      headers: { token: token || "" },
-      body: formData,
-    });
-    const data = await res.json();
-    if (!res.ok) return { url: "", error: data.error };
-    return { url: data.url };
-  } catch {
-    return { url: "", error: "Upload failed." };
-  }
-};
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/upload-image", {
+        method: "POST",
+        headers: { token: token || "" },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) return { url: "", error: data.error };
+      return { url: data.url };
+    } catch {
+      return { url: "", error: "Upload failed." };
+    }
+  };
 
   const handleDeleteItem = async (itemId: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -272,7 +250,6 @@ setItems((prev) => [...prev, newItem]
   return (
     <Category
       categoryName={category.categoryName}
-      categoryId={categoryId || ""}
       collections={collections}
       criteria={criteria}
       items={items}
