@@ -23,7 +23,9 @@ const HomePage: React.FC = () => {
           return;
         }
         const data = await res.json();
-        setCategories(data.userCategories || []);
+        setCategories((data.userCategories || []).sort((a : Category, b : Category) => 
+        a.categoryName.localeCompare(b.categoryName)
+        ));
       } catch (err) {
         console.error("Failed to fetch categories:", err);
       }
@@ -80,9 +82,9 @@ const HomePage: React.FC = () => {
 
       // Append new category to sidebar
       setCategories((prev) => [
-        ...prev,
-        { _id: newCategoryId, categoryName: catData.categoryName },
-      ]);
+  ...prev,
+  { _id: newCategoryId, categoryName: catData.categoryName },
+  ].sort((a, b) => a.categoryName.localeCompare(b.categoryName)));
 
       return { success: true };
     } catch (err) {
@@ -119,13 +121,17 @@ const HomePage: React.FC = () => {
       }
     }
     // Add new criteria
-    for (const c of criteria) {
-      if (!existingCriteria.find((ec) => ec.criteriaName === c)) {
-        await fetch("/api/categories/criteria", { method: "POST", headers: { "Content-Type": "application/json", token: token || "" }, body: JSON.stringify({ criteriaName: c, categoryId }) });
-      }
+  for (const c of criteria) {
+    if (!existingCriteria.find((ec) => ec.criteriaName === c)) {
+      await fetch("/api/categories/criteria", { method: "POST", headers: { "Content-Type": "application/json", token: token || "" }, body: JSON.stringify({ criteriaName: c, categoryId }) });
     }
-    setCategories((prev) => prev.map((cat) => cat._id === categoryId ? { ...cat, categoryName: name } : cat));
-    return { success: true };
+  }
+
+setCategories((prev) => prev.map((cat) => 
+  cat._id === categoryId ? { ...cat, categoryName: name } : cat
+).sort((a, b) => a.categoryName.localeCompare(b.categoryName)));
+
+return { success: true };
   } catch { return { success: false, error: "Unable to connect to server." }; }
 };
 
