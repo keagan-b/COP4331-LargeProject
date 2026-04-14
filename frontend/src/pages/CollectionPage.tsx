@@ -53,7 +53,7 @@ const CollectionPage: React.FC = () => {
     const headers = { token: token || "" };
 
     const fetchCriteriaAndItems = async () => {
-      // ////criteria
+      //criteria
       try {
         const res = await fetch(`/api/categories/criteria?categoryId=${category._id}`, { headers });
         if (res.ok) {
