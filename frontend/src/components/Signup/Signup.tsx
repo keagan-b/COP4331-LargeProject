@@ -12,6 +12,7 @@ const Signup: React.FC = () => {
   const [resendMessage, setResendMessage] = useState("");
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  //cooldown to prevent spam
   const startCooldown = () => {
     setCooldown(3);
     cooldownRef.current = setInterval(() => {
