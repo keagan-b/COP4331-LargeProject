@@ -27,13 +27,14 @@ html, body {
   margin-bottom: 20px;
   font-family: 'Squada One', cursive;
   color: white;
+  margin-top: -10px;
 }
 
 /* Login box */
 .login-box {
   border: 5px solid #007acc;
   border-radius: 12px;
-  padding: 40px;
+  padding: 20px;
   width: 350px;
   background-color: #1e1e1e;
   box-shadow: 0 0 0px rgba(0, 0, 0, 0.6);
@@ -50,7 +51,7 @@ html, body {
 /* Labels */
 .login-box label {
   display: block;
-  margin-top: 15px;
+  margin-top: 10px;
   margin-bottom: 5px;
   justify-self: start;
   font-size: 1rem;
@@ -84,13 +85,12 @@ html, body {
 /* Button */
 .login-box button {
   width: 70%;
-  margin: 20px auto;
+  margin: 10px auto;
   display: block;
   padding: 10px;
-  border-radius: 50px;
-  background-color: white;
-  border: 5px solid #007acc;
-  color: black;
+  border-radius: 15px;
+  background-color: #007acc;
+  color: white;
   cursor: pointer;
   font-size: 1.2rem;
 }
@@ -112,4 +112,20 @@ html, body {
 
 .signup-text a:hover {
   text-decoration: underline;
+}
+.login-logo {
+  width:175px;
+  height: 175px;
+  object-fit: contain;
+  margin-bottom: 0px;
+}
+
+.login-message.success {
+  color: #02d93e;
+  text-align: center;
+}
+
+.login-message {
+  color: red;
+  text-align: center;
 }
