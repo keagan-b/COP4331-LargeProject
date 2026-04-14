@@ -49,6 +49,10 @@ const Home: React.FC<HomeProps> = ({
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [deleteModalError, setDeleteModalError] = useState("");
 
+  useEffect(() => {
+  document.title = "Home | Collector's Pair-A-Dice";
+}, []);
+
   // Close menu on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -136,8 +140,12 @@ const Home: React.FC<HomeProps> = ({
   return (
     <div className="home-wrapper">
       {/* Header */}
-      <header className="home-header">
+      <header className="home-header"> {/* or category-header / collection-header */}
+      <div className="header-center">
+        <img src="/projectlogo.png" alt="Logo" className="header-logo" />
         <h1>Collector's Pair-A-Dice</h1>
+      </div>
+
         <button className="logout-btn" onClick={onLogout}>Log Out</button>
       </header>
 
