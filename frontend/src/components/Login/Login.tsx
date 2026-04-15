@@ -35,7 +35,7 @@ const Login: React.FC = () => {
     setIsSuccess(true);
 
       setTimeout(() => {
-        navigate("/");
+        navigate("/home");
       }, 1000);
     } catch (err) {
       setMessage("Unable to connect to the server. Please try again later.");
