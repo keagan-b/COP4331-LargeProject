@@ -38,7 +38,15 @@ jobs:
 
             git pull origin main
 
-            ./build.sh
+            cd ./frontend/
+
+            npm install
+
+            npm run build
+
+            rm -rf /var/www/html/
+            mkdir /var/www/html
+            cp -r dist/* /var/www/html
 
             npm install
 
