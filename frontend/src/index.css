@@ -1,0 +1,81 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   GLOBAL THEME VARIABLES
+   These live on :root (default) and are overridden by [data-theme="tropical"].
+   Every page's CSS already uses these var() names so they inherit for free.
+═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Default (dark blue) theme ──────────────────────────────────── */
+  --bg-base:        #0a0c10;
+  --bg-surface:     #0f1218;
+  --bg-raised:      #161b26;
+  --bg-card:        #1a2030;
+
+  --accent:         #0090e0;
+  --accent-dim:     rgba(0,144,224,0.12);
+  --accent-border:  rgba(0,144,224,0.28);
+  --accent-glow:    rgba(0,144,224,0.45);
+
+  --green:          #00d46a;
+  --red:            #e04040;
+
+  --text-primary:   #eef0f5;
+  --text-secondary: rgba(180,200,230,0.65);
+  --text-muted:     rgba(140,165,200,0.4);
+  --border-subtle:  rgba(255,255,255,0.06);
+
+  --btn-bg:         linear-gradient(135deg, #0072c3 0%, #005fa3 100%);
+  --btn-bg-hover:   linear-gradient(135deg, #0082d8 0%, #006dba 100%);
+  --btn-shadow:     0 4px 18px rgba(0,100,200,0.3);
+  --btn-text:       #ffffff;
+
+  --sidebar-width:  240px;
+  --header-height:  68px;
+  --radius-sm:      6px;
+  --radius-md:      10px;
+  --radius-lg:      14px;
+
+  /* Smooth transitions when theme flips */
+  --theme-transition: background 0.7s ease, color 0.7s ease,
+                      border-color 0.7s ease, box-shadow 0.7s ease;
+}
+
+/* ── Tropical theme overrides ─────────────────────────────────────── */
+[data-theme="tropical"] {
+  --bg-base:        #0d4a6e;
+  --bg-surface:     #0a3a56;
+  --bg-raised:      #0f5070;
+  --bg-card:        #1a6080;
+
+  --accent:         #e07800;
+  --accent-dim:     rgba(224,120,0,0.15);
+  --accent-border:  rgba(224,120,0,0.35);
+  --accent-glow:    rgba(255,160,0,0.5);
+
+  --green:          #20c060;
+  --red:            #e04040;
+
+  --text-primary:   #fff8e8;
+  --text-secondary: rgba(255,230,170,0.75);
+  --text-muted:     rgba(200,180,120,0.5);
+  --border-subtle:  rgba(255,200,80,0.1);
+
+  --btn-bg:         linear-gradient(135deg, #e07800 0%, #c05a00 100%);
+  --btn-bg-hover:   linear-gradient(135deg, #f08c10 0%, #d06800 100%);
+  --btn-shadow:     0 4px 18px rgba(180,80,0,0.35);
+  --btn-text:       #ffffff;
+}
+
+/* Apply theme transitions globally */
+body,
+.home-wrapper, .category-wrapper, .collection-wrapper,
+.home-header, .category-header, .collection-header,
+.home-sidebar, .category-sidebar, .collection-sidebar,
+.home-main, .category-main, .collection-main,
+.login-box, .modal-box,
+.category-btn, .collection-btn, .category-card,
+.item-card, .add-category-btn, .add-collection-btn,
+.logout-btn, .modal-confirm, .modal-cancel, .modal-delete, .modal-edit,
+.search-input, .filter-btn, .col-menu-btn, .col-menu-popover {
+  transition: var(--theme-transition);
+}

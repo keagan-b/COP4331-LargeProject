@@ -1,0 +1,648 @@
+@import url('https://fonts.googleapis.com/css2?family=Squada+One&family=Exo+2:wght@300;400;500;600;700&display=swap');
+
+/* ─── Reset ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Exo 2', sans-serif;
+}
+
+/* ─── Wrapper ────────────────────────────────────────────────────────── */
+.home-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────── */
+.home-header {
+  height: var(--header-height);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
+  position: relative;
+  box-shadow: 0 1px 0 var(--border-subtle), 0 4px 24px rgba(0,0,0,0.4);
+}
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.header-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(0,160,255,0.4));
+}
+
+.home-header h1 {
+  font-family: 'Squada One', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  text-shadow: 0 0 20px var(--accent-glow);
+  position: static;
+  transform: none;
+}
+
+/* ─── Logout Button ──────────────────────────────────────────────────── */
+.logout-btn {
+  margin-left: auto;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid rgba(0,144,224,0.25);
+  padding: 7px 18px;
+  border-radius: var(--radius-sm);
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.logout-btn:hover {
+  background: rgba(0,144,224,0.12);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+/* ─── Body ───────────────────────────────────────────────────────────── */
+.home-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ─── Sidebar ────────────────────────────────────────────────────────── */
+.home-sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--accent-border);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  gap: 10px;
+  flex-shrink: 0;
+  height: 100%;
+  overflow: visible;
+  box-shadow: 1px 0 0 var(--border-subtle);
+}
+
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 2px;
+  min-height: 0;
+}
+
+.sidebar-scroll::-webkit-scrollbar { width: 3px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+
+/* ─── Category Rows ──────────────────────────────────────────────────── */
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+}
+
+.category-btn {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-btn:hover {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  border-color: var(--accent-border);
+}
+
+.category-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(0,144,224,0.12);
+}
+
+/* ─── Three-dot Menu ─────────────────────────────────────────────────── */
+.col-menu-wrapper { position: relative; flex-shrink: 0; }
+
+.col-menu-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  line-height: 1;
+}
+
+.col-menu-btn:hover {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  border-color: var(--accent-border);
+}
+
+.col-menu-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: auto;
+  background: var(--bg-raised);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  min-width: 120px;
+}
+
+.col-menu-option {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.col-menu-option:hover {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+}
+
+.col-menu-option-delete { color: #e06060; }
+
+.col-menu-option-delete:hover {
+  background: rgba(220,60,60,0.12);
+  color: #f07070;
+}
+
+/* ─── Add Category Button ────────────────────────────────────────────── */
+.add-category-btn {
+  width: 100%;
+  background: transparent;
+  color: var(--green);
+  border: 1px solid rgba(0,212,106,0.35);
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  margin-top: 4px;
+  letter-spacing: 0.03em;
+}
+
+.add-category-btn:hover {
+  background: rgba(0,212,106,0.1);
+  border-color: var(--green);
+}
+
+/* ─── Main ───────────────────────────────────────────────────────────── */
+.home-main {
+  flex: 1;
+  padding: 24px 28px;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+
+.home-main::-webkit-scrollbar { width: 3px; }
+.home-main::-webkit-scrollbar-track { background: transparent; }
+.home-main::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+
+/* ─── Breadcrumb ─────────────────────────────────────────────────────── */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-family: 'Exo 2', sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.breadcrumb span {
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.breadcrumb span:hover { color: var(--text-primary); }
+.breadcrumb-sep { color: rgba(255,255,255,0.15); }
+
+/* ─── Home Title ─────────────────────────────────────────────────────── */
+.home-title {
+  font-family: 'Squada One', sans-serif;
+  font-size: 2rem;
+  font-weight: 400;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 12px;
+}
+
+/* ─── Modal ──────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(6px);
+}
+
+.modal-box {
+  background: var(--bg-raised);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,144,224,0.1);
+}
+
+.modal-box::-webkit-scrollbar { width: 3px; }
+.modal-box::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+
+.modal-box h3 {
+  font-family: 'Squada One', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.modal-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.modal-box input {
+  background: rgba(0,10,25,0.5);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.92rem;
+  padding: 9px 13px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+}
+
+.modal-box input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,144,224,0.12);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.modal-confirm {
+  background: rgba(0,212,106,0.15);
+  color: var(--green);
+  border: 1px solid rgba(0,212,106,0.4);
+  border-radius: var(--radius-sm);
+  padding: 9px 22px;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.modal-confirm:hover {
+  background: rgba(0,212,106,0.25);
+  border-color: var(--green);
+}
+
+.modal-cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 9px 22px;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.modal-cancel:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.modal-delete {
+  background: rgba(220,60,60,0.15);
+  color: #f07070;
+  border: 1px solid rgba(220,60,60,0.4);
+  border-radius: var(--radius-sm);
+  padding: 9px 22px;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.modal-delete:hover {
+  background: rgba(220,60,60,0.28);
+  border-color: #e04040;
+}
+
+.modal-edit {
+  background: rgba(0,144,224,0.15);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  padding: 9px 22px;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.modal-edit:hover {
+  background: rgba(0,144,224,0.28);
+  border-color: var(--accent);
+}
+
+.modal-divider {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  width: 100%;
+}
+
+.error-msg {
+  color: #f07070;
+  font-size: 0.82rem;
+  text-align: center;
+  background: rgba(220,60,60,0.08);
+  border: 1px solid rgba(220,60,60,0.2);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  width: 100%;
+}
+
+/* ─── Criteria Tags ──────────────────────────────────────────────────── */
+.criteria-input-row {
+  display: flex;
+  gap: 7px;
+  width: 100%;
+}
+
+.criteria-input-row input { flex: 1; }
+
+.add-criterion-btn {
+  background: rgba(0,144,224,0.15);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 13px;
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.add-criterion-btn:hover {
+  background: rgba(0,144,224,0.28);
+}
+
+.criteria-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.criteria-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  color: var(--text-secondary);
+  font-family: 'Exo 2', sans-serif;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.remove-tag {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.remove-tag:hover { color: #f07070; }
+
+/* ─── Category Card Grid ─────────────────────────────────────────────── */
+.category-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+.category-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.category-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 144, 224, 0.2);
+}
+
+.category-card-image {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: var(--bg-raised);
+  flex-shrink: 0;
+}
+
+.category-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.category-card:hover .category-card-image img {
+  transform: scale(1.04);
+}
+
+.category-card-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-family: 'Exo 2', sans-serif;
+  letter-spacing: 0.03em;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 144, 224, 0.03) 10px,
+    rgba(0, 144, 224, 0.03) 20px
+  );
+}
+
+.category-card-label {
+  padding: 10px 14px;
+  font-family: 'Squada One', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Empty State ────────────────────────────────────────────────────── */
+.home-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-family: 'Exo 2', sans-serif;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TROPICAL OVERRIDES — Home
+   These kick in automatically when [data-theme="tropical"] is on <html>
+   because all colour values use var() which resolve from :root overrides.
+   The selectors below handle anything that was hardcoded rather than
+   var()-based.
+═══════════════════════════════════════════════════════════════════════ */
+[data-theme="tropical"] .login-box button,
+[data-theme="tropical"] .modal-confirm { background: var(--btn-bg); }
+[data-theme="tropical"] .modal-confirm:hover { background: var(--btn-bg-hover); }
+
+[data-theme="tropical"] .home-header {
+  background: var(--bg-surface);
+  border-bottom-color: var(--accent-border);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+[data-theme="tropical"] .home-header h1 {
+  text-shadow: 0 0 20px var(--accent-glow);
+}
+
+[data-theme="tropical"] .category-card {
+  background: var(--bg-card);
+  border-color: var(--accent-border);
+}
+[data-theme="tropical"] .category-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 10px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(224,120,0,0.25);
+}
+[data-theme="tropical"] .add-category-btn {
+  color: var(--green);
+  border-color: rgba(32,192,96,0.35);
+}
+[data-theme="tropical"] .add-category-btn:hover {
+  background: rgba(32,192,96,0.12);
+  border-color: var(--green);
+}
