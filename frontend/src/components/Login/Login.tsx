@@ -31,9 +31,6 @@ const Login: React.FC = () => {
       }
 
       localStorage.setItem("token", data.sessionToken);
-      setMessage("Login successful!");
-      setIsSuccess(true);
-
       navigate("/home");
     } catch (err) {
       setMessage("Unable to connect to the server. Please try again later.");
