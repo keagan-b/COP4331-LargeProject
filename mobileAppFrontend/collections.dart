@@ -83,35 +83,23 @@ class _CollectionsPageState extends State<CollectionsPage> {
         headers: {'token': ApiService.sessionToken ?? ''},
       );
       final data = jsonDecode(res.body);
-      final raw = (data['items'] as List).cast<Map<String, dynamic>>();
+      final raw = (data['items'] as List? ?? []).cast<Map<String, dynamic>>();
 
-      // Hydrate criteria values for each item
-      final hydrated = await Future.wait(raw.map((item) async {
-        try {
-          final cvRes = await http.get(
-            Uri.parse(
-                '${ApiService.baseUrl}/api/items/criteria/all?itemId=${item['_id']}'),
-            headers: {'token': ApiService.sessionToken ?? ''},
-          );
-          final cvData = jsonDecode(cvRes.body);
-          final Map<String, String> values = {};
-          for (final cv in (cvData['itemCriteria'] ?? [])) {
-            final match = _criteria.firstWhere(
-              (c) => c.id == cv['categoryCriteriaId'].toString(),
-              orElse: () => CriterionModel(id: '', name: ''),
-            );
-            if (match.name.isNotEmpty) {
-              values[match.name] = cv['criteriaValue'];
-            }
-          }
-          return ItemModel.fromJson(item, values);
-        } catch (_) {
-          return ItemModel.fromJson(item, {});
+      _items = raw.map((item) {
+        final cv = item['criteriaValues'];
+        final Map<String, String> values = {};
+        if (cv is Map) {
+          cv.forEach((k, v) {
+            if (k != null && v != null) values[k.toString()] = v.toString();
+          });
         }
-      }));
-
-      _items = hydrated;
-    } catch (_) {}
+        final rawItem = Map<String, dynamic>.from(item);
+        rawItem['imageUrl'] ??= item['image_url'] ?? item['ImageUrl'] ?? item['image'];
+        return ItemModel.fromJson(rawItem, values);
+      }).toList();
+    } catch (e) {
+      print('collections _fetchItems ERROR: $e');
+    }
   }
 
   Future<void> _addCollection(String name) async {
@@ -211,7 +199,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
         title: const Text('New Collection',
             style: TextStyle(
                 color: Colors.white,
-                fontFamily: 'Impact',
+                fontFamily: 'SquadaOne',
                 fontWeight: FontWeight.w900)),
         content: _dialogTextField(ctrl, 'Collection name'),
         actions: [
@@ -219,7 +207,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel',
                 style:
-                    TextStyle(color: Colors.white70, fontFamily: 'Impact')),
+                    TextStyle(color: Colors.white70, fontFamily: 'SquadaOne')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -236,7 +224,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
             ),
             child: const Text('Create',
                 style: TextStyle(
-                    fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+                    fontFamily: 'SquadaOne', fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -257,7 +245,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
             Text(col.name,
                 style: const TextStyle(
                     color: Colors.white,
-                    fontFamily: 'Impact',
+                    fontFamily: 'SquadaOne',
                     fontSize: 18,
                     fontWeight: FontWeight.w900)),
             const SizedBox(height: 16),
@@ -265,7 +253,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
               leading: const Icon(Icons.edit, color: Color(0xFF007ACC)),
               title: const Text('Edit',
                   style:
-                      TextStyle(color: Colors.white, fontFamily: 'Impact')),
+                      TextStyle(color: Colors.white, fontFamily: 'SquadaOne')),
               onTap: () {
                 Navigator.pop(context);
                 _showEditCollectionDialog(col);
@@ -275,7 +263,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
               leading: const Icon(Icons.delete, color: Colors.redAccent),
               title: const Text('Delete',
                   style:
-                      TextStyle(color: Colors.white, fontFamily: 'Impact')),
+                      TextStyle(color: Colors.white, fontFamily: 'SquadaOne')),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteCollectionDialog(col);
@@ -298,7 +286,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
         title: const Text('Edit Collection',
             style: TextStyle(
                 color: Colors.white,
-                fontFamily: 'Impact',
+                fontFamily: 'SquadaOne',
                 fontWeight: FontWeight.w900)),
         content: _dialogTextField(ctrl, 'Collection name'),
         actions: [
@@ -306,7 +294,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel',
                 style:
-                    TextStyle(color: Colors.white70, fontFamily: 'Impact')),
+                    TextStyle(color: Colors.white70, fontFamily: 'SquadaOne')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -323,7 +311,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
             ),
             child: const Text('Save',
                 style: TextStyle(
-                    fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+                    fontFamily: 'SquadaOne', fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -340,19 +328,19 @@ class _CollectionsPageState extends State<CollectionsPage> {
         title: const Text('Delete Collection',
             style: TextStyle(
                 color: Colors.white,
-                fontFamily: 'Impact',
+                fontFamily: 'SquadaOne',
                 fontWeight: FontWeight.w900)),
         content: Text(
           'Are you sure you want to delete "${col.name}"? This cannot be undone.',
           style:
-              const TextStyle(color: Colors.white70, fontFamily: 'Impact'),
+              const TextStyle(color: Colors.white70, fontFamily: 'SquadaOne'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel',
                 style:
-                    TextStyle(color: Colors.white70, fontFamily: 'Impact')),
+                    TextStyle(color: Colors.white70, fontFamily: 'SquadaOne')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -367,7 +355,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
             ),
             child: const Text('Delete',
                 style: TextStyle(
-                    fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+                    fontFamily: 'SquadaOne', fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -433,7 +421,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'Impact')),
+                            fontFamily: 'SquadaOne')),
                   ),
                 ],
               ),
@@ -463,7 +451,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
                               color: Colors.white,
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
-                              fontFamily: 'Impact',
+                              fontFamily: 'SquadaOne',
                               decoration: TextDecoration.underline,
                               decorationColor: Colors.white)),
                     ),
@@ -472,13 +460,13 @@ class _CollectionsPageState extends State<CollectionsPage> {
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'Impact')),
+                            fontFamily: 'SquadaOne')),
                     Text(widget.category.name,
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'Impact')),
+                            fontFamily: 'SquadaOne')),
                   ],
                 ),
               ),
@@ -543,7 +531,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
                                   style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w900,
-                                      fontFamily: 'Impact')),
+                                      fontFamily: 'SquadaOne')),
                             ),
                           ),
                         )),
@@ -573,7 +561,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
                         dropdownColor: const Color(0xFF3A3A3A),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontFamily: 'Impact',
+                          fontFamily: 'SquadaOne',
                           fontWeight: FontWeight.w900,
                           fontSize: 14,
                         ),
@@ -606,14 +594,14 @@ class _CollectionsPageState extends State<CollectionsPage> {
                         controller: _searchController,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontFamily: 'Impact',
+                          fontFamily: 'SquadaOne',
                           fontSize: 14,
                         ),
                         decoration: InputDecoration(
                           hintText: 'Search by $_searchField…',
                           hintStyle: const TextStyle(
                             color: Colors.white38,
-                            fontFamily: 'Impact',
+                            fontFamily: 'SquadaOne',
                             fontSize: 14,
                           ),
                           filled: true,
@@ -672,7 +660,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
                                   : 'No items match your search.',
                               style: const TextStyle(
                                   color: Colors.white70,
-                                  fontFamily: 'Impact',
+                                  fontFamily: 'SquadaOne',
                                   fontSize: 16)))
                       : GridView.builder(
                           padding: const EdgeInsets.symmetric(
@@ -750,7 +738,7 @@ class _CollectionsPageState extends State<CollectionsPage> {
                                         textAlign: TextAlign.center,
                                         style: const TextStyle(
                                           color: Colors.white,
-                                          fontFamily: 'Impact',
+                                          fontFamily: 'SquadaOne',
                                           fontWeight: FontWeight.w900,
                                           fontSize: 13,
                                         ),

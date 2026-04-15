@@ -204,7 +204,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
           title: const Text('New Category',
               style: TextStyle(
                   color: Colors.white,
-                  fontFamily: 'Impact',
+                  fontFamily: 'SquadaOne',
                   fontWeight: FontWeight.w900)),
           content: SingleChildScrollView(
             child: Column(
@@ -215,7 +215,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 const Text('Name',
                     style: TextStyle(
                         color: Colors.white70,
-                        fontFamily: 'Impact',
+                        fontFamily: 'SquadaOne',
                         fontSize: 13)),
                 const SizedBox(height: 6),
                 _dialogTextField(nameCtrl, 'Category name'),
@@ -224,7 +224,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 const Text('Criteria',
                     style: TextStyle(
                         color: Colors.white70,
-                        fontFamily: 'Impact',
+                        fontFamily: 'SquadaOne',
                         fontSize: 13)),
                 const SizedBox(height: 6),
                 Row(
@@ -251,7 +251,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                       ),
                       child: const Text('Add',
                           style: TextStyle(
-                              fontFamily: 'Impact',
+                              fontFamily: 'SquadaOne',
                               fontWeight: FontWeight.w900)),
                     ),
                   ],
@@ -269,7 +269,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                               child: Text(c,
                                   style: const TextStyle(
                                       color: Colors.white,
-                                      fontFamily: 'Impact',
+                                      fontFamily: 'SquadaOne',
                                       fontSize: 14)),
                             ),
                             GestureDetector(
@@ -290,7 +290,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel',
                   style: TextStyle(
-                      color: Colors.white70, fontFamily: 'Impact')),
+                      color: Colors.white70, fontFamily: 'SquadaOne')),
             ),
             ElevatedButton(
               onPressed: () {
@@ -307,7 +307,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
               ),
               child: const Text('Create',
                   style: TextStyle(
-                      fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+                      fontFamily: 'SquadaOne', fontWeight: FontWeight.w900)),
             ),
           ],
         ),
@@ -332,7 +332,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
           title: const Text('Edit Category',
               style: TextStyle(
                   color: Colors.white,
-                  fontFamily: 'Impact',
+                  fontFamily: 'SquadaOne',
                   fontWeight: FontWeight.w900)),
           content: SingleChildScrollView(
             child: Column(
@@ -342,7 +342,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 const Text('Name',
                     style: TextStyle(
                         color: Colors.white70,
-                        fontFamily: 'Impact',
+                        fontFamily: 'SquadaOne',
                         fontSize: 13)),
                 const SizedBox(height: 6),
                 _dialogTextField(nameCtrl, 'Category name'),
@@ -350,7 +350,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 const Text('Criteria',
                     style: TextStyle(
                         color: Colors.white70,
-                        fontFamily: 'Impact',
+                        fontFamily: 'SquadaOne',
                         fontSize: 13)),
                 const SizedBox(height: 6),
                 Row(
@@ -377,7 +377,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                       ),
                       child: const Text('Add',
                           style: TextStyle(
-                              fontFamily: 'Impact',
+                              fontFamily: 'SquadaOne',
                               fontWeight: FontWeight.w900)),
                     ),
                   ],
@@ -395,7 +395,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                               child: Text(c,
                                   style: const TextStyle(
                                       color: Colors.white,
-                                      fontFamily: 'Impact',
+                                      fontFamily: 'SquadaOne',
                                       fontSize: 14)),
                             ),
                             GestureDetector(
@@ -416,7 +416,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel',
                   style: TextStyle(
-                      color: Colors.white70, fontFamily: 'Impact')),
+                      color: Colors.white70, fontFamily: 'SquadaOne')),
             ),
             ElevatedButton(
               onPressed: () {
@@ -433,7 +433,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
               ),
               child: const Text('Save',
                   style: TextStyle(
-                      fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+                      fontFamily: 'SquadaOne', fontWeight: FontWeight.w900)),
             ),
           ],
         ),
@@ -451,18 +451,18 @@ class _CategoriesPageState extends State<CategoriesPage> {
         title: const Text('Delete Category',
             style: TextStyle(
                 color: Colors.white,
-                fontFamily: 'Impact',
+                fontFamily: 'SquadaOne',
                 fontWeight: FontWeight.w900)),
         content: Text(
           'Are you sure you want to delete "${cat.name}"? This cannot be undone.',
-          style: const TextStyle(color: Colors.white70, fontFamily: 'Impact'),
+          style: const TextStyle(color: Colors.white70, fontFamily: 'SquadaOne'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel',
                 style:
-                    TextStyle(color: Colors.white70, fontFamily: 'Impact')),
+                    TextStyle(color: Colors.white70, fontFamily: 'SquadaOne')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -477,7 +477,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
             ),
             child: const Text('Delete',
                 style: TextStyle(
-                    fontFamily: 'Impact', fontWeight: FontWeight.w900)),
+                    fontFamily: 'SquadaOne', fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -544,7 +544,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'Impact')),
+                            fontFamily: 'SquadaOne')),
                   ),
                 ],
               ),
@@ -566,7 +566,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    fontFamily: 'Impact',
+                    fontFamily: 'SquadaOne',
                   ),
                 ),
               ),
@@ -609,7 +609,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                           child: Text('No categories yet.',
                               style: TextStyle(
                                   color: Colors.white70,
-                                  fontFamily: 'Impact',
+                                  fontFamily: 'SquadaOne',
                                   fontSize: 16)))
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(
@@ -647,7 +647,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                       style: const TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.w900,
-                                          fontFamily: 'Impact')),
+                                          fontFamily: 'SquadaOne')),
                                 ),
                               ),
                             );
@@ -674,7 +674,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
             Text(cat.name,
                 style: const TextStyle(
                     color: Colors.white,
-                    fontFamily: 'Impact',
+                    fontFamily: 'SquadaOne',
                     fontSize: 18,
                     fontWeight: FontWeight.w900)),
             const SizedBox(height: 16),
@@ -683,7 +683,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                   const Icon(Icons.edit, color: Color(0xFF007ACC)),
               title: const Text('Edit',
                   style: TextStyle(
-                      color: Colors.white, fontFamily: 'Impact')),
+                      color: Colors.white, fontFamily: 'SquadaOne')),
               onTap: () {
                 Navigator.pop(context);
                 _showEditCategoryDialog(cat);
@@ -694,7 +694,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                   const Icon(Icons.delete, color: Colors.redAccent),
               title: const Text('Delete',
                   style: TextStyle(
-                      color: Colors.white, fontFamily: 'Impact')),
+                      color: Colors.white, fontFamily: 'SquadaOne')),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteCategoryDialog(cat);
