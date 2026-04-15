@@ -36,6 +36,10 @@ jobs:
           script: |
             cd /var/webserver/
 
+            git stash
+
+            git rebase main
+
             git pull origin main
 
             cd ./frontend/
