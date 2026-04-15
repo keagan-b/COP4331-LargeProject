@@ -1,130 +1,489 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  background-color: #1e1e1e;
-  height: 100%;
+@import url('https://fonts.googleapis.com/css2?family=Squada+One&family=Exo+2:wght@300;400;500;600&family=Pacifico&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; background: #0a0c10; }
+#root { height: 100%; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TRANSITION TIMING
+   All "feels" live here so it's easy to tune one number
+═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --t-duration: 0.85s;
+  --t-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-#root {
-  height: 100%;
-}
+/* ═══════════════════════════════════════════════════════════════════════
+   PAGE SHELL
+═══════════════════════════════════════════════════════════════════════ */
 .login-container {
   height: 100vh;
-  background-color: #1e1e1e;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-family: 'Squada One', cursive;
-  color: white;
+  font-family: 'Exo 2', sans-serif;
+  color: #e8eaf0;
+  position: relative;
+  overflow: hidden;
+  /* Background is faked via layered pseudo + overlay so we can cross-fade */
+  background: #0a0c10;
 }
 
-/* Title */
-.login-container h1 {
-  font-size: 3rem;
-  font-weight: bold;
-  margin-bottom: 20px;
-  font-family: 'Squada One', cursive;
-  color: white;
-  margin-top: -10px;
+/* Dark grid background — fades out during transition */
+.login-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,122,204,0.18) 0%, transparent 70%),
+    linear-gradient(180deg, #0a0c10 0%, #111520 100%);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,122,204,0.18) 0%, transparent 70%),
+    linear-gradient(180deg, #0a0c10 0%, #111520 100%),
+    linear-gradient(rgba(0,122,204,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,122,204,0.04) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+  z-index: 0;
+  transition: opacity var(--t-duration) var(--t-ease);
+  pointer-events: none;
 }
 
-/* Login box */
-.login-box {
-  border: 5px solid #007acc;
-  border-radius: 12px;
-  padding: 20px;
-  width: 350px;
-  background-color: #1e1e1e;
-  box-shadow: 0 0 0px rgba(0, 0, 0, 0.6);
+/* Cross-fade overlay — sits on top of palm scene, starts opaque, fades out */
+.theme-overlay {
+  position: absolute;
+  inset: 0;
+  background: #0a0c10;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-duration) var(--t-ease);
 }
 
-/* Heading */
-.login-box h2 {
-  text-align: center;
-  margin-bottom: 0px;
-  margin-top: 0px;
-  font-size: 32px;
+/* When transitioning TO tropical: fade dark overlay out, dim grid */
+.login-container.scene-entering::before,
+.login-container.scene-active::before   { opacity: 0; }
+
+.login-container.scene-entering .theme-overlay { opacity: 1; } /* starts opaque */
+.login-container.scene-active   .theme-overlay { opacity: 0; } /* fades away  */
+
+/* When transitioning FROM tropical back to default */
+.login-container.scene-leaving .theme-overlay  { opacity: 1; } /* fades IN, covers palm scene */
+.login-container.scene-leaving .palm-scene      { opacity: 0; }
+.login-container.scene-leaving::before          { opacity: 1; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PALM SCENE WRAPPER
+═══════════════════════════════════════════════════════════════════════ */
+.palm-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  transition: opacity var(--t-duration) var(--t-ease);
 }
 
-/* Labels */
-.login-box label {
-  display: block;
-  margin-top: 10px;
-  margin-bottom: 5px;
-  justify-self: start;
-  font-size: 1rem;
+/* Sky sunset gradient layer */
+.sky-layer {
+  position: absolute;
+  inset: 0;
 }
 
-/* Inputs */
-.login-box input {
+.sky-sunset {
+  background: linear-gradient(
+    180deg,
+    #1a0533 0%,       /* deep violet zenith */
+    #6b1f6e 10%,      /* purple */
+    #c0472a 22%,      /* burnt orange-red */
+    #f07030 32%,      /* orange */
+    #f5a030 42%,      /* amber */
+    #f5c842 52%,      /* gold — horizon */
+    #6abbd8 52%,      /* sky-meets-water */
+    #2a8ab5 65%,      /* mid water */
+    #0e5c82 80%,      /* deep water */
+    #073d58 100%      /* very deep */
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SUN
+═══════════════════════════════════════════════════════════════════════ */
+.sun {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7a0 0%, #ffe040 45%, #ff9500 100%);
+  box-shadow:
+    0 0 0 12px rgba(255,200,60,0.15),
+    0 0 0 28px rgba(255,160,40,0.1),
+    0 0 60px 20px rgba(255,140,0,0.5);
+  animation: sunPulse 5s ease-in-out infinite;
+}
+
+/* Sun reflection on water — thin shimmering stripe */
+.sun::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 120px;
+  background: linear-gradient(180deg, rgba(255,210,80,0.6) 0%, transparent 100%);
+  filter: blur(4px);
+  animation: reflectionFlicker 2.5s ease-in-out infinite;
+}
+
+@keyframes sunPulse {
+  0%, 100% { box-shadow: 0 0 0 12px rgba(255,200,60,0.15), 0 0 0 28px rgba(255,160,40,0.1), 0 0 60px 20px rgba(255,140,0,0.5); }
+  50%       { box-shadow: 0 0 0 18px rgba(255,200,60,0.2),  0 0 0 40px rgba(255,160,40,0.12), 0 0 80px 28px rgba(255,140,0,0.65); }
+}
+
+@keyframes reflectionFlicker {
+  0%, 100% { opacity: 0.7; width: 18px; }
+  50%       { opacity: 1;   width: 26px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   OCEAN
+═══════════════════════════════════════════════════════════════════════ */
+.ocean {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 42%;
+  overflow: hidden;
+}
+
+/* Deep water base */
+.ocean-depth {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(100,195,220,0.0) 0%,
+    rgba(40,140,190,0.85) 15%,
+    rgba(14,80,125,0.95)  55%,
+    #073050               100%
+  );
+}
+
+/* Shimmer — moves diagonally to look like light on water */
+.shimmer-layer {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    108deg,
+    transparent 0px,
+    transparent 28px,
+    rgba(255,255,255,0.06) 28px,
+    rgba(255,255,255,0.06) 30px
+  );
+  animation: shimmerScroll 6s linear infinite;
+}
+
+@keyframes shimmerScroll {
+  from { background-position: 0 0; }
+  to   { background-position: 120px 60px; }
+}
+
+/* ── Wave rows ─────────────────────────────────────────────────────── */
+/* Each row is a set of overlapping ellipses that scroll left */
+.wave-row {
+  position: absolute;
+  left: 0;
+  width: 220%;
+  display: flex;
+  gap: 0;
+}
+
+.wave-row-back  { top: 4%;  opacity: 0.35; }
+.wave-row-mid   { top: 18%; opacity: 0.55; }
+.wave-row-front { top: 34%; opacity: 0.8;  }
+
+.wavelet {
+  flex-shrink: 0;
+  width: 22%;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  filter: blur(1px);
+  transform: scaleY(0.35);
+}
+
+/* Offset every other wavelet for natural look */
+.wavelet:nth-child(even) { margin-top: 6px; }
+
+.wave-row-back  { animation: waveScroll 9s  linear infinite; }
+.wave-row-mid   { animation: waveScroll 6s  linear infinite; }
+.wave-row-front { animation: waveScroll 4s  linear infinite; }
+
+.wave-row-back  .wavelet { height: 22px; background: rgba(200,235,255,0.4); }
+.wave-row-mid   .wavelet { height: 28px; background: rgba(220,245,255,0.5); }
+.wave-row-front .wavelet { height: 36px; background: rgba(255,255,255,0.65); filter: blur(0.5px); }
+
+@keyframes waveScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Foam edge at very bottom */
+.foam {
+  position: absolute;
+  bottom: 0;
+  left: -5%;
+  width: 110%;
+  height: 18px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 50% 50% 0 0 / 80% 80% 0 0;
+  filter: blur(2px);
+  animation: foamPulse 3s ease-in-out infinite;
+}
+
+@keyframes foamPulse {
+  0%, 100% { transform: scaleX(1)   scaleY(1); opacity: 0.55; }
+  50%       { transform: scaleX(1.02) scaleY(1.3); opacity: 0.75; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PALM TREES  (image + CSS fallback)
+═══════════════════════════════════════════════════════════════════════ */
+.palm {
+  position: absolute;
+  bottom: 35%;   /* sits at the water's edge */
+  z-index: 3;
+  width: 200px;
+  height: 380px;
+}
+
+.palm-left  { left:  -30px; transform-origin: bottom center; animation: palmSway  6s ease-in-out infinite; }
+.palm-right { right: -30px; transform-origin: bottom center; animation: palmSwayR 6s ease-in-out infinite; }
+
+@keyframes palmSway  {
+  0%, 100% { transform: rotate(-3deg); }
+  50%       { transform: rotate(3deg);  }
+}
+@keyframes palmSwayR {
+  0%, 100% { transform: rotate(3deg);  }
+  50%       { transform: rotate(-3deg); }
+}
+
+/* Image palm */
+.palm-img {
   width: 100%;
-  padding: 10px;
-  border: none;
-  background-color: #cfcfcf;
-  color: #000000;
-  border-radius: 2px;
-  outline: none;
-}
-
-/* Forgot password */
-.forgot-password {
-  display: block;
-  text-align: left;
-  margin-top: 10px;
-  color: #1e3aff;
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.forgot-password:hover {
-  text-decoration: underline;
-}
-
-/* Button */
-.login-box button {
-  width: 70%;
-  margin: 10px auto;
-  display: block;
-  padding: 10px;
-  border-radius: 15px;
-  background-color: #007acc;
-  color: white;
-  cursor: pointer;
-  font-size: 1.2rem;
-}
-
-.login-box button:hover {
-  background-color: #b5b5b5;
-}
-
-/* Signup text */
-.signup-text {
-  text-align: center;
-  font-size: 0.9rem;
-}
-
-.signup-text a {
-  color: #1e3aff;
-  text-decoration: none;
-}
-
-.signup-text a:hover {
-  text-decoration: underline;
-}
-.login-logo {
-  width:175px;
-  height: 175px;
+  height: 100%;
   object-fit: contain;
-  margin-bottom: 0px;
+  object-position: bottom center;
+  display: block;
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5));
 }
 
-.login-message.success {
-  color: #02d93e;
-  text-align: center;
+/* CSS fallback — shown only when image fails */
+.palm-css-fallback { position: absolute; inset: 0; }
+
+/* Hide the fallback when the image loaded successfully.
+   We do this by checking if the img is visible (no error). */
+.palm-img:not([style*="display: none"]) ~ .palm-css-fallback {
+  display: none;
 }
 
+/* Trunk */
+.trunk {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) rotate(-8deg);
+  transform-origin: bottom center;
+  width: 22px;
+  height: 240px;
+  background: linear-gradient(to right, #7a4f2e, #b8793a, #7a4f2e);
+  border-radius: 12px 12px 6px 6px;
+}
+.trunk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    180deg, transparent 0, transparent 12px,
+    rgba(0,0,0,0.14) 12px, rgba(0,0,0,0.14) 14px
+  );
+  border-radius: inherit;
+}
+
+/* Fronds */
+.fronds { position: absolute; top: 10px; left: 50%; width: 0; height: 0; }
+.frond {
+  position: absolute;
+  width: 110px; height: 18px;
+  background: linear-gradient(to right, #256325, #45a03a, #256325);
+  border-radius: 0 60% 60% 0;
+  transform-origin: 0% 50%;
+}
+.frond-0 { transform: rotate(-75deg) translateX(10px); }
+.frond-1 { transform: rotate(-50deg) translateX(8px);  }
+.frond-2 { transform: rotate(-25deg) translateX(6px);  }
+.frond-3 { transform: rotate(  0deg) translateX(5px);  }
+.frond-4 { transform: rotate( 25deg) translateX(6px);  }
+.frond-5 { transform: rotate( 50deg) translateX(8px);  }
+.frond-6 { transform: rotate( 75deg) translateX(10px); }
+.frond { animation: frondWave 4s ease-in-out infinite; }
+.frond-0,.frond-6 { animation-delay: 0s;   }
+.frond-1,.frond-5 { animation-delay: 0.15s;}
+.frond-2,.frond-4 { animation-delay: 0.3s; }
+.frond-3          { animation-delay: 0.45s;}
+@keyframes frondWave {
+  0%,100% { filter: brightness(1);    }
+  50%     { filter: brightness(1.15); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FOREGROUND ELEMENTS — z-index above palm scene
+═══════════════════════════════════════════════════════════════════════ */
+.login-logo,
+.login-container h1,
+.login-box { position: relative; z-index: 5; }
+
+/* ─── Logo ──────────────────────────────────────────────────────────── */
+.login-logo {
+  width: 110px; height: 110px;
+  object-fit: contain;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 18px rgba(0,160,255,0.35));
+  transition: transform 0.3s ease, filter var(--t-duration) var(--t-ease);
+}
+.login-logo:hover { transform: scale(1.08) rotate(-3deg); }
+.login-logo.tropical-logo {
+  filter: drop-shadow(0 0 22px rgba(255,200,0,0.6));
+  animation: logoBounce 2.2s ease-in-out infinite;
+}
+@keyframes logoBounce {
+  0%,100% { transform: translateY(0)   rotate(0deg);  }
+  50%      { transform: translateY(-8px) rotate(4deg); }
+}
+
+/* ─── Title ─────────────────────────────────────────────────────────── */
+.login-container h1 {
+  font-family: 'Squada One', sans-serif;
+  font-size: 2.4rem; font-weight: 400; letter-spacing: 0.06em;
+  color: #fff;
+  margin: 0 0 20px 0;
+  text-shadow: 0 0 32px rgba(0,150,255,0.4);
+  transition: color var(--t-duration) var(--t-ease),
+              text-shadow var(--t-duration) var(--t-ease),
+              font-size var(--t-duration) var(--t-ease);
+}
+
+/* ─── Login Box ─────────────────────────────────────────────────────── */
+.login-box {
+  border: 1px solid rgba(0,160,255,0.3);
+  border-radius: 16px;
+  padding: 28px 32px 24px; width: 360px;
+  background: rgba(15,18,28,0.85);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 0 0 1px rgba(0,160,255,0.08), 0 8px 40px rgba(0,0,0,0.6),
+              inset 0 1px 0 rgba(255,255,255,0.05);
+  transition:
+    border-color  var(--t-duration) var(--t-ease),
+    box-shadow    var(--t-duration) var(--t-ease),
+    background    var(--t-duration) var(--t-ease);
+}
+.login-box h2 {
+  font-family: 'Squada One', sans-serif;
+  font-size: 1.7rem; font-weight: 400; letter-spacing: 0.04em;
+  text-align: center; color: #fff; margin: 0 0 20px 0;
+  transition: color var(--t-duration) var(--t-ease);
+}
+.login-box label {
+  display: block; margin-top: 14px; margin-bottom: 6px;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: rgba(160,190,220,0.7);
+  transition: color var(--t-duration) var(--t-ease);
+}
+.login-box input {
+  width: 100%; padding: 10px 14px;
+  border: 1px solid rgba(0,140,220,0.35); border-radius: 8px;
+  background: rgba(0,10,25,0.6); color: #e8eaf0;
+  font-family: 'Exo 2', sans-serif; font-size: 0.95rem; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s,
+              background var(--t-duration) var(--t-ease),
+              color var(--t-duration) var(--t-ease);
+}
+.login-box input:focus { border-color: #007acc; box-shadow: 0 0 0 3px rgba(0,122,204,0.15); }
+.forgot-password {
+  display: block; text-align: right; margin-top: 8px;
+  color: rgba(100,160,220,0.7); text-decoration: none; font-size: 0.8rem;
+  transition: color 0.2s;
+}
+.forgot-password:hover { color: #4da6e8; }
+.login-box button {
+  width: 100%; margin: 20px 0 0; padding: 11px; border: none;
+  border-radius: 9px; background: linear-gradient(135deg, #0072c3 0%, #005fa3 100%);
+  color: #fff; cursor: pointer; font-family: 'Squada One', sans-serif;
+  font-size: 1.05rem; letter-spacing: 0.07em;
+  transition: background var(--t-duration) var(--t-ease),
+              box-shadow 0.2s, transform 0.1s;
+  box-shadow: 0 4px 18px rgba(0,100,200,0.3);
+}
+.login-box button:hover {
+  background: linear-gradient(135deg, #0082d8 0%, #006dba 100%);
+  box-shadow: 0 6px 24px rgba(0,120,220,0.45); transform: translateY(-1px);
+}
+.login-box button:active { transform: translateY(0); }
+.signup-text {
+  text-align: center; font-size: 0.85rem; margin-top: 16px;
+  color: rgba(160,180,210,0.6);
+  transition: color var(--t-duration) var(--t-ease);
+}
+.signup-text a { color: #4da6e8; text-decoration: none; font-weight: 500; }
+.signup-text a:hover { text-decoration: underline; }
 .login-message {
-  color: red;
-  text-align: center;
+  text-align: center; font-size: 0.85rem; margin-top: 12px; padding: 8px 12px;
+  border-radius: 6px; background: rgba(220,60,60,0.12);
+  border: 1px solid rgba(220,60,60,0.25); color: #f07070;
 }
+.login-message.success {
+  background: rgba(0,200,80,0.1); border-color: rgba(0,200,80,0.25); color: #50e090;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TROPICAL FOREGROUND OVERRIDES (title + box)
+   These kick in as soon as .tropical is set, and transition smoothly
+═══════════════════════════════════════════════════════════════════════ */
+.login-container.tropical h1 {
+  font-family: 'Pacifico', cursive;
+  font-size: 2rem;
+  color: #fff5c0;
+  text-shadow: 2px 3px 0 rgba(180,80,0,0.45), 0 0 28px rgba(255,180,0,0.55);
+}
+
+.login-container.tropical .login-box {
+  background: rgba(255,245,210,0.88);
+  border-color: rgba(210,140,40,0.5);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.7);
+}
+.login-container.tropical .login-box h2 { color: #7a3d00; }
+.login-container.tropical .login-box label { color: rgba(100,60,0,0.75); }
+.login-container.tropical .login-box input {
+  background: rgba(255,255,240,0.9); border-color: rgba(210,140,40,0.5); color: #3a2800;
+}
+.login-container.tropical .login-box input:focus {
+  border-color: #e07800; box-shadow: 0 0 0 3px rgba(224,120,0,0.18);
+}
+.login-container.tropical .login-box button {
+  background: linear-gradient(135deg, #e07800 0%, #c05a00 100%);
+  box-shadow: 0 4px 18px rgba(180,80,0,0.35);
+}
+.login-container.tropical .login-box button:hover {
+  background: linear-gradient(135deg, #f08c10 0%, #d06800 100%);
+  box-shadow: 0 6px 24px rgba(200,100,0,0.5);
+}
+.login-container.tropical .forgot-password { color: #c07000; }
+.login-container.tropical .forgot-password:hover { color: #e08800; }
+.login-container.tropical .signup-text { color: rgba(80,40,0,0.65); }
+.login-container.tropical .signup-text a { color: #0070b0; }

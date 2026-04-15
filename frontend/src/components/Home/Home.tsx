@@ -8,6 +8,7 @@ interface Category {
 
 interface HomeProps {
   categories: Category[];
+  categoryThumbnails: Record<string, string | null>;
   onCategorySelect: (category: Category) => void;
   onAddCategory: (name: string, criteria: string[]) => Promise<{ success: boolean; error?: string }>;
   onEditCategory: (categoryId: string, name: string, criteria: string[]) => Promise<{ success: boolean; error?: string }>;
@@ -18,6 +19,7 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({
   categories,
+  categoryThumbnails,
   onCategorySelect,
   onAddCategory,
   onEditCategory,
@@ -50,8 +52,8 @@ const Home: React.FC<HomeProps> = ({
   const [deleteModalError, setDeleteModalError] = useState("");
 
   useEffect(() => {
-  document.title = "Home | Collector's Pair-A-Dice";
-}, []);
+    document.title = "Home | Collector's Pair-A-Dice";
+  }, []);
 
   // Close menu on outside click
   useEffect(() => {
@@ -77,7 +79,7 @@ const Home: React.FC<HomeProps> = ({
     setAddModalError("");
     setShowAddModal(true);
   };
-// Add Criteria
+
   const handleAddCriterion = () => {
     const val = newCriterion.trim();
     if (!val) return;
@@ -100,7 +102,6 @@ const Home: React.FC<HomeProps> = ({
     setEditCategoryName(cat.categoryName);
     setEditNewCriterion("");
     setEditModalError("");
-    // Load existing criteria
     const existing = await getCategoryCriteria(cat._id);
     setEditCriteriaList(existing);
     setShowEditModal(true);
@@ -137,15 +138,16 @@ const Home: React.FC<HomeProps> = ({
     else setDeleteModalError(result.error || "Failed to delete category.");
   };
 
+  const displayedCards = categories.slice(0, 10);
+
   return (
     <div className="home-wrapper">
       {/* Header */}
-      <header className="home-header"> {/* or category-header / collection-header */}
-      <div className="header-center">
-        <img src="/projectlogo.png" alt="Logo" className="header-logo" />
-        <h1>Collector's Pair-A-Dice</h1>
-      </div>
-
+      <header className="home-header">
+        <div className="header-center">
+          <img src="/projectlogo.png" alt="Logo" className="header-logo" />
+          <h1>Collector's Pair-A-Dice</h1>
+        </div>
         <button className="logout-btn" onClick={onLogout}>Log Out</button>
       </header>
 
@@ -162,7 +164,6 @@ const Home: React.FC<HomeProps> = ({
                   {cat.categoryName}
                 </button>
 
-                {/* Three-dot menu */}
                 <div className="col-menu-wrapper">
                   <button
                     className="col-menu-btn"
@@ -198,7 +199,39 @@ const Home: React.FC<HomeProps> = ({
           <div className="breadcrumb">
             <span>Home</span>
           </div>
-          <h2 className="home-title">Home</h2>
+          <h2 className="home-title">Your Collections</h2>
+
+          {categories.length === 0 ? (
+            <div className="home-empty">
+              <p>No categories yet. Create one in the sidebar to get started.</p>
+            </div>
+          ) : (
+            <div className="category-card-grid">
+              {displayedCards.map((cat) => {
+                const thumb = categoryThumbnails[cat._id];
+                return (
+                  <button
+                    key={cat._id}
+                    className="category-card"
+                    onClick={() => handleCategoryClick(cat)}
+                  >
+                    <div className="category-card-image">
+                      {thumb ? (
+                        <img src={thumb} alt={cat.categoryName} />
+                      ) : (
+                        <div className="category-card-placeholder">
+                          <span>No items yet</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="category-card-label">
+                      {cat.categoryName}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </main>
       </div>
 

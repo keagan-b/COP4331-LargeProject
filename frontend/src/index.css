@@ -1,111 +1,81 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   GLOBAL THEME VARIABLES
+   These live on :root (default) and are overridden by [data-theme="tropical"].
+   Every page's CSS already uses these var() names so they inherit for free.
+═══════════════════════════════════════════════════════════════════════ */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* ── Default (dark blue) theme ──────────────────────────────────── */
+  --bg-base:        #0a0c10;
+  --bg-surface:     #0f1218;
+  --bg-raised:      #161b26;
+  --bg-card:        #1a2030;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --accent:         #0090e0;
+  --accent-dim:     rgba(0,144,224,0.12);
+  --accent-border:  rgba(0,144,224,0.28);
+  --accent-glow:    rgba(0,144,224,0.45);
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --green:          #00d46a;
+  --red:            #e04040;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --text-primary:   #eef0f5;
+  --text-secondary: rgba(180,200,230,0.65);
+  --text-muted:     rgba(140,165,200,0.4);
+  --border-subtle:  rgba(255,255,255,0.06);
+
+  --btn-bg:         linear-gradient(135deg, #0072c3 0%, #005fa3 100%);
+  --btn-bg-hover:   linear-gradient(135deg, #0082d8 0%, #006dba 100%);
+  --btn-shadow:     0 4px 18px rgba(0,100,200,0.3);
+  --btn-text:       #ffffff;
+
+  --sidebar-width:  240px;
+  --header-height:  68px;
+  --radius-sm:      6px;
+  --radius-md:      10px;
+  --radius-lg:      14px;
+
+  /* Smooth transitions when theme flips */
+  --theme-transition: background 0.7s ease, color 0.7s ease,
+                      border-color 0.7s ease, box-shadow 0.7s ease;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* ── Tropical theme overrides ─────────────────────────────────────── */
+[data-theme="tropical"] {
+  --bg-base:        #0d4a6e;
+  --bg-surface:     #0a3a56;
+  --bg-raised:      #0f5070;
+  --bg-card:        #1a6080;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+  --accent:         #e07800;
+  --accent-dim:     rgba(224,120,0,0.15);
+  --accent-border:  rgba(224,120,0,0.35);
+  --accent-glow:    rgba(255,160,0,0.5);
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+  --green:          #20c060;
+  --red:            #e04040;
+
+  --text-primary:   #fff8e8;
+  --text-secondary: rgba(255,230,170,0.75);
+  --text-muted:     rgba(200,180,120,0.5);
+  --border-subtle:  rgba(255,200,80,0.1);
+
+  --btn-bg:         linear-gradient(135deg, #e07800 0%, #c05a00 100%);
+  --btn-bg-hover:   linear-gradient(135deg, #f08c10 0%, #d06800 100%);
+  --btn-shadow:     0 4px 18px rgba(180,80,0,0.35);
+  --btn-text:       #ffffff;
 }
 
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+/* Apply theme transitions globally */
+body,
+.home-wrapper, .category-wrapper, .collection-wrapper,
+.home-header, .category-header, .collection-header,
+.home-sidebar, .category-sidebar, .collection-sidebar,
+.home-main, .category-main, .collection-main,
+.login-box, .modal-box,
+.category-btn, .collection-btn, .category-card,
+.item-card, .add-category-btn, .add-collection-btn,
+.logout-btn, .modal-confirm, .modal-cancel, .modal-delete, .modal-edit,
+.search-input, .filter-btn, .col-menu-btn, .col-menu-popover {
+  transition: var(--theme-transition);
 }

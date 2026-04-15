@@ -6,6 +6,7 @@ import SignupPage from "./pages/SignupPage";
 import CategoryPage from "./pages/CategoryPage";
 import CollectionPage from "./pages/CollectionPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import { useTheme } from "./hooks/useTheme";
 
 const PrivateRoute = ({ element }: { element: React.ReactElement }) => {
   const token = localStorage.getItem("token");
@@ -13,6 +14,10 @@ const PrivateRoute = ({ element }: { element: React.ReactElement }) => {
 };
 
 function App() {
+  // Calling useTheme here ensures the data-theme attribute on <html> is always
+  // in sync with localStorage, even when navigating between pages.
+  useTheme();
+
   return (
     <BrowserRouter>
       <Routes>
