@@ -1516,7 +1516,7 @@ app.get('/api/user/request-password-reset', async (req, res) => {
       }
     )
 
-    var resetUrl = `http://group7.sedsucf.org/api/resetpassword?token=${passwordResetToken}`;
+    var resetUrl = `http://group7.sedsucf.org/resetpassword?token=${passwordResetToken}`;
 
     var content = '<p>Please use this link to reset your password: <a href="' + resetUrl + '">reset</a><br><i>The link will expire in 1 hour.</i></p>'
 
