@@ -48,7 +48,8 @@ const CollectionPage: React.FC = () => {
     if (!collection || !category) { navigate("/home"); return; }
 
     // Sync sibling collections from location state
-    setSiblingCollections(state?.siblingCollections || []);
+    setSiblingCollections(state?.siblingCollections || [])
+      .sort((a: SiblingCollection, b: SiblingCollection) => a.collectionName.localeCompare(b.collectionName)));
 
     const headers = { token: token || "" };
 
@@ -71,6 +72,7 @@ const CollectionPage: React.FC = () => {
         const data = await res.json();
         const allItems: Item[] = data.items || [];
         setItems(allItems.filter((item) => item.collectionId?.toString() === collectionId));
+        .sort((a: Item, b: Item) => a.itemName.localeCompare(b.itemName))
       } catch (err) {
         console.error("Failed to fetch items:", err);
       }
@@ -110,7 +112,8 @@ const CollectionPage: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || "Failed to update." };
-      setSiblingCollections((prev) => prev.map((c) => c._id === collectionId ? { ...c, collectionName: newName } : c));
+      setSiblingCollections((prev) => prev.map((c) => c._id === collectionId ? { ...c, collectionName: newName } : c)
+      .sort((a: SiblingCollection, b: SiblingCollection) => a.collectionName.localeCompare(b.collectionName)));
       return { success: true };
     } catch {
       return { success: false, error: "Unable to connect to server." };
@@ -163,7 +166,7 @@ const handleAddItem = async (
       collectionId,
       criteriaValues,
       imageUrl: imageUrl || null,
-    }]);
+    }].sort((a: Item, b: Item) => a.itemName.localeCompare(b.itemName)));
     return { success: true };
   } catch {
     return { success: false, error: "Unable to connect to server." };
@@ -186,7 +189,7 @@ const handleEditItem = async (
     if (!res.ok) return { success: false, error: data.error || "Failed to update item." };
     setItems((prev) => prev.map((item) =>
       item._id === itemId ? { ...item, itemName, criteriaValues, imageUrl: imageUrl || null } : item
-    ));
+    ).sort((a: Item, b: Item) => a.itemName.localeCompare(b.itemName)));
     return { success: true };
   } catch {
     return { success: false, error: "Unable to connect to server." };
