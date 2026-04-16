@@ -230,13 +230,13 @@ const Category: React.FC<CategoryProps> = ({
 
     return (
         <div className="category-wrapper">
-            <header className="category-header"> {/* or category-header / collection-header */}
+            <header className="category-header">
                 <div className="header-center">
                     <img src="/projectlogo.png" alt="Logo" className="header-logo" />
                     <h1>Collector's Pair-A-Dice</h1>
                 </div>
-                <button className="logout-btn" onClick={onLogout}>Log Out</button>
-            </header>
+            <button className="logout-btn" onClick={onLogout}>Log Out</button>
+          </header>
 
             <div className="category-body">
                 <aside className="category-sidebar">
