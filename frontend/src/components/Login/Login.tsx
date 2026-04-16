@@ -165,6 +165,7 @@ const Login: React.FC = () => {
       />
       <h1 className="title">Collector's Pair-A-Dice</h1>
 
+      <main>
       <div className="login-box">
         <h2>Login</h2>
         <form onSubmit={handleSubmit}>
@@ -182,6 +183,7 @@ const Login: React.FC = () => {
           Don't have an account? <Link to="/signup">Sign Up</Link>
         </p>
       </div>
+      </main>
     </div>
   );
 };
