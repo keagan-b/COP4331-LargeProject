@@ -191,13 +191,13 @@ const Collection: React.FC<CollectionProps> = ({
     };
 
     return (
-        <div className="collection-wrapper">
-            <header className="collection-header">
+        <div className="home-wrapper">
+            <header className="home-header">
                 <div className="header-center">
-                <img src="/projectlogo.png" alt="Logo" className="header-logo" />
-                <h1>Collector's Pair-A-Dice</h1>
-            </div>
-            <button className="logout-btn" onClick={onLogout}>Log Out</button>
+                    <img src="/projectlogo.png" alt="Logo" className="header-logo" />
+                    <h1>Collector's Pair-A-Dice</h1>
+                </div>
+                <button className="logout-btn" onClick={onLogout}>Log Out</button>
             </header>
 
             <div className="collection-body">
