@@ -168,10 +168,10 @@ const Login: React.FC = () => {
       <div className="login-box">
         <h2>Login</h2>
         <form onSubmit={handleSubmit}>
-          <label>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <label>Password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <label htmlFor="email">Email</label>
+          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label htmlFor="password">Password</label>
+          <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           <Link to="/resetpassword" className="forgot-password">Forgot Password</Link>
           <button type="submit">Log In</button>
         </form>
